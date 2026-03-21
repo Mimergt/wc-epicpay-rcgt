@@ -555,10 +555,12 @@ class EpicPay extends WC_Payment_Gateway {
     $body_raw = wp_remote_retrieve_body( $response );
     $body = json_decode( $body_raw, true );
 
+    $requires_refund = false;
     if ( 201 !== $code && $this->is_tokenization_min_amount_error( $body, $body_raw ) ) {
-      // Algunas cuentas rechazan amount_in_cents=0. Fallback: setup checkout sin items.
-      $this->log_message( 'warning', 'EpicPay tokenization min amount validation detected, retrying without items.' );
-      $payload = $this->get_tokenization_checkout_payload( $user_id, true );
+      // Algunas cuentas rechazan amount_in_cents=0. Fallback: micro-cobro para tokenizar y luego reembolsar.
+      $this->log_message( 'warning', 'EpicPay tokenization min amount validation detected, retrying with minimum amount micro-charge.' );
+      $payload = $this->get_tokenization_checkout_payload( $user_id, false, true );
+      $requires_refund = true;
       $response = wp_remote_post(
         $url,
         array(
@@ -596,6 +598,7 @@ class EpicPay extends WC_Payment_Gateway {
     }
 
     update_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id', $checkout_id );
+    update_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund', $requires_refund ? 'yes' : 'no' );
     $this->log_message( 'info', 'EpicPay tokenization checkout created: user=' . $user_id . ' checkout=' . $checkout_id );
 
     return array(
@@ -621,15 +624,18 @@ class EpicPay extends WC_Payment_Gateway {
     }
 
     $pending_checkout_id = (string) get_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id', true );
+    $requires_refund = 'yes' === (string) get_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund', true );
 
     if ( 1 !== $status ) {
       delete_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id' );
+      delete_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund' );
       wc_add_notice( __( 'Guardado de tarjeta cancelado por el usuario.', 'epicpay' ), 'notice' );
       wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
       exit;
     }
 
     if ( empty( $pending_checkout_id ) ) {
+      delete_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund' );
       wc_add_notice( __( 'No se encontró una tokenización pendiente.', 'epicpay' ), 'error' );
       wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
       exit;
@@ -638,6 +644,7 @@ class EpicPay extends WC_Payment_Gateway {
     $checkout = $this->get_checkout_by_id( $pending_checkout_id );
     if ( is_wp_error( $checkout ) ) {
       $this->log_message( 'error', 'EpicPay tokenization checkout fetch failed: ' . $checkout->get_error_message() );
+      delete_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund' );
       wc_add_notice( __( 'No se pudo confirmar la tarjeta guardada. Intenta de nuevo.', 'epicpay' ), 'error' );
       wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
       exit;
@@ -646,6 +653,7 @@ class EpicPay extends WC_Payment_Gateway {
     $payment_method_data = $this->extract_payment_method_data( $checkout );
     if ( empty( $payment_method_data['id'] ) ) {
       $this->log_message( 'error', 'EpicPay tokenization missing payment_method_id for checkout=' . $pending_checkout_id );
+      delete_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund' );
       wc_add_notice( __( 'No se recibió el identificador del método de pago desde Recurrente.', 'epicpay' ), 'error' );
       wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
       exit;
@@ -654,12 +662,30 @@ class EpicPay extends WC_Payment_Gateway {
     $save_result = $this->persist_user_payment_token( $user_id, $payment_method_data );
     if ( is_wp_error( $save_result ) ) {
       $this->log_message( 'error', 'EpicPay token save failed: ' . $save_result->get_error_message() );
+      delete_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund' );
       wc_add_notice( $save_result->get_error_message(), 'error' );
       wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
       exit;
     }
 
+    if ( $requires_refund ) {
+      $payment_intent_id = $this->extract_payment_intent_id( $checkout );
+      if ( ! empty( $payment_intent_id ) ) {
+        $refund_result = $this->create_refund( $payment_intent_id );
+        if ( is_wp_error( $refund_result ) ) {
+          $this->log_message( 'warning', 'EpicPay tokenization refund failed: ' . $refund_result->get_error_message() );
+          wc_add_notice( __( 'Tarjeta guardada. El reembolso del cobro de verificación quedó pendiente de revisión.', 'epicpay' ), 'notice' );
+        } else {
+          $this->log_message( 'info', 'EpicPay tokenization micro-charge refunded: payment_intent=' . $payment_intent_id );
+        }
+      } else {
+        $this->log_message( 'warning', 'EpicPay tokenization requires refund but payment_intent_id not found. checkout=' . $pending_checkout_id );
+        wc_add_notice( __( 'Tarjeta guardada. No se identificó automáticamente el pago para reembolsar, revisa en Recurrente.', 'epicpay' ), 'notice' );
+      }
+    }
+
     delete_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id' );
+    delete_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund' );
     wc_add_notice( __( 'Tarjeta guardada exitosamente.', 'epicpay' ), 'success' );
     wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
     exit;
@@ -671,7 +697,7 @@ class EpicPay extends WC_Payment_Gateway {
   * @param int $user_id Usuario WP.
   * @return array
   */
-  private function get_tokenization_checkout_payload( $user_id, $without_items = false ) {
+  private function get_tokenization_checkout_payload( $user_id, $without_items = false, $force_minimum_charge = false ) {
     $currency = get_woocommerce_currency();
     $recurrente_user_id = (string) get_user_meta( $user_id, 'epicpay_recurrente_user_id', true );
     $success_url = add_query_arg(
@@ -704,11 +730,12 @@ class EpicPay extends WC_Payment_Gateway {
     );
 
     if ( ! $without_items ) {
+      $amount_in_cents = $force_minimum_charge ? (int) apply_filters( 'epicpay_tokenization_min_amount_in_cents', 500 ) : 0;
       $payload['items'] = array(
         array(
-          'name' => __( 'Guardar método de pago', 'epicpay' ),
+          'name' => $force_minimum_charge ? __( 'Verificación de tarjeta', 'epicpay' ) : __( 'Guardar método de pago', 'epicpay' ),
           'currency' => $currency,
-          'amount_in_cents' => 0,
+          'amount_in_cents' => max( 0, $amount_in_cents ),
           'charge_type' => 'one_time',
           'quantity' => 1,
         ),
@@ -742,6 +769,67 @@ class EpicPay extends WC_Payment_Gateway {
       || false !== strpos( $message, 'precio debe ser mayor' )
       || false !== strpos( $message, 'mayor a q5' )
       || false !== strpos( $message, 'prices debe ser un numero mayor' );
+  }
+
+  /**
+  * Extrae payment_intent id desde respuesta checkout.
+  *
+  * @param array $checkout Checkout response.
+  * @return string
+  */
+  private function extract_payment_intent_id( $checkout ) {
+    if ( isset( $checkout['payment_intent']['id'] ) ) {
+      return (string) $checkout['payment_intent']['id'];
+    }
+
+    if ( isset( $checkout['payment_intent_id'] ) ) {
+      return (string) $checkout['payment_intent_id'];
+    }
+
+    if ( isset( $checkout['payment']['id'] ) && 0 === strpos( (string) $checkout['payment']['id'], 'pa_' ) ) {
+      return (string) $checkout['payment']['id'];
+    }
+
+    return '';
+  }
+
+  /**
+  * Crea reembolso completo por payment_intent.
+  *
+  * @param string $payment_intent_id ID del payment intent.
+  * @return array|WP_Error
+  */
+  private function create_refund( $payment_intent_id ) {
+    if ( '' === trim( (string) $payment_intent_id ) ) {
+      return new WP_Error( 'epicpay_refund_missing_payment_intent', __( 'Falta payment_intent_id para reembolso.', 'epicpay' ) );
+    }
+
+    $url = trailingslashit( $this->get_api_base_url() ) . 'refunds';
+    $payload = array( 'payment_intent_id' => (string) $payment_intent_id );
+
+    $response = wp_remote_post(
+      $url,
+      array(
+        'headers' => $this->get_api_headers(),
+        'body' => wp_json_encode( $payload ),
+        'timeout' => 30,
+      )
+    );
+
+    if ( is_wp_error( $response ) ) {
+      return $response;
+    }
+
+    $code = (int) wp_remote_retrieve_response_code( $response );
+    $body_raw = wp_remote_retrieve_body( $response );
+    $body = json_decode( $body_raw, true );
+
+    if ( 200 !== $code ) {
+      $message = is_array( $body ) && isset( $body['message'] ) ? (string) $body['message'] : __( 'No se pudo crear el reembolso.', 'epicpay' );
+      return new WP_Error( 'epicpay_refund_failed', $message );
+    }
+
+    return is_array( $body ) ? $body : array();
   }
 
   /**
