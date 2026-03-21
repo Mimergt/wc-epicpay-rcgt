@@ -68,13 +68,60 @@ class EpicPay extends WC_Payment_Gateway {
     $environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
 
     if ( 'live' === $environment ) {
-      $this->public_key = ! empty( $this->live_public_key ) ? $this->live_public_key : $this->public_key;
-      $this->secret_key = ! empty( $this->live_secret_key ) ? $this->live_secret_key : $this->secret_key;
+      $this->public_key = ! empty( $this->live_public_key ) ? trim( $this->live_public_key ) : trim( (string) $this->public_key );
+      $this->secret_key = ! empty( $this->live_secret_key ) ? trim( $this->live_secret_key ) : trim( (string) $this->secret_key );
       return;
     }
 
-    $this->public_key = ! empty( $this->sandbox_public_key ) ? $this->sandbox_public_key : $this->public_key;
-    $this->secret_key = ! empty( $this->sandbox_secret_key ) ? $this->sandbox_secret_key : $this->secret_key;
+    $this->public_key = ! empty( $this->sandbox_public_key ) ? trim( $this->sandbox_public_key ) : trim( (string) $this->public_key );
+    $this->secret_key = ! empty( $this->sandbox_secret_key ) ? trim( $this->sandbox_secret_key ) : trim( (string) $this->secret_key );
+  }
+
+  /**
+  * Determina si el soporte de suscripciones está habilitado desde settings.
+  *
+  * @return bool
+  */
+  private function is_subscriptions_enabled() {
+    return ! isset( $this->enable_subscriptions ) || 'yes' === $this->enable_subscriptions;
+  }
+
+  /**
+  * Lista de features relacionadas a WooCommerce Subscriptions.
+  *
+  * @return array
+  */
+  private function get_subscription_supports() {
+    return array(
+      'subscriptions',
+      'subscription_cancellation',
+      'subscription_suspension',
+      'subscription_reactivation',
+      'subscription_amount_changes',
+      'subscription_date_changes',
+      'subscription_payment_method_change',
+      'subscription_payment_method_change_customer',
+      'subscription_payment_method_change_admin',
+    );
+  }
+
+  /**
+  * Detecta si una orden contiene suscripciones.
+  *
+  * @param int $order_id ID de la orden.
+  * @return bool
+  */
+  private function order_contains_subscription( $order_id ) {
+    if ( function_exists( 'wcs_order_contains_subscription' ) ) {
+      return (bool) wcs_order_contains_subscription( $order_id );
+    }
+
+    if ( function_exists( 'wcs_get_subscriptions_for_order' ) ) {
+      $subscriptions = wcs_get_subscriptions_for_order( $order_id );
+      return ! empty( $subscriptions );
+    }
+
+    return false;
   }
 
   /**
@@ -110,10 +157,14 @@ class EpicPay extends WC_Payment_Gateway {
   * @since 2.0.1
   */
   public function supports( $feature ) {
+    if ( in_array( $feature, $this->get_subscription_supports(), true ) && ! $this->is_subscriptions_enabled() ) {
+      return false;
+    }
+
     // Validar que el gateway esté activo y tenga credenciales para suscripciones
     if ( 'subscriptions' === $feature ) {
       // Verificar que WC Subscriptions esté activo
-      if ( ! function_exists( 'wcs_is_subscription' ) ) {
+      if ( ! function_exists( 'wcs_order_contains_subscription' ) && ! function_exists( 'wcs_get_subscriptions_for_order' ) ) {
         error_log( 'EpicPay: WC Subscriptions not active' );
         return false;
       }
@@ -374,10 +425,16 @@ class EpicPay extends WC_Payment_Gateway {
   */
   public function process_payment( $order_id ) {
     $customer_order = new WC_Order( $order_id );
+    $is_subscription_order = $this->order_contains_subscription( $order_id );
     
     // Detectar si es una suscripción
     // Primero verificar que WC_Subscriptions está disponible
-    if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order_id ) ) {
+    if ( $is_subscription_order ) {
+      if ( ! $this->is_subscriptions_enabled() ) {
+        wc_add_notice( __( 'El soporte de suscripciones de EpicPay está desactivado en la configuración.', 'epicpay' ), 'error' );
+        return array( 'result' => 'failure' );
+      }
+
       // Validar que WC_Subscriptions_Order existe
       if ( ! class_exists( 'WC_Subscriptions_Order' ) ) {
         wc_add_notice( 
@@ -405,7 +462,7 @@ class EpicPay extends WC_Payment_Gateway {
       return array( 'result' => 'failure' );
     }
 
-    $note = function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order_id ) 
+    $note = $is_subscription_order
       ? 'EpicPay: Se inicializó suscripción.'
       : 'EpicPay: Se inicializo el proceso de pago.';
 

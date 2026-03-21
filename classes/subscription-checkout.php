@@ -54,14 +54,30 @@ class Subscription_Checkout {
 			);
 
 			if ( ! is_wp_error( $response ) ) {
+				$status_code = (int) wp_remote_retrieve_response_code( $response );
+				if ( 200 !== $status_code ) {
+					error_log( 'EpicPay: Error consultando productos Recurrente (HTTP ' . $status_code . ')' );
+					return;
+				}
+
 				$body     = json_decode( wp_remote_retrieve_body( $response ), true );
 				$products = is_array( $body ) ? $body : array();
 
-				// Filter para productos con dynamic pricing
+				// Filtrar productos recurrentes con dynamic pricing
 				$this->recurrente_products = array_filter(
 					$products,
 					function ( $product ) {
-						return isset( $product['has_dynamic_pricing'] ) && $product['has_dynamic_pricing'];
+						if ( empty( $product['has_dynamic_pricing'] ) || empty( $product['prices'] ) || ! is_array( $product['prices'] ) ) {
+							return false;
+						}
+
+						foreach ( $product['prices'] as $price ) {
+							if ( isset( $price['charge_type'] ) && 'recurring' === $price['charge_type'] ) {
+								return true;
+							}
+						}
+
+						return false;
 					}
 				);
 
@@ -155,6 +171,9 @@ class Subscription_Checkout {
 
 		// El monto del checkout es el pago inicial
 		$checkout_amount = ! empty( $initial_payment ) ? $initial_payment : $price_per_period;
+		if ( empty( $checkout_amount ) ) {
+			$checkout_amount = (float) $this->customer_order->get_total();
+		}
 		$amount_in_cents = (int) round( (float) $checkout_amount * 100 );
 
 		$order_id   = $this->customer_order->get_id();
@@ -224,7 +243,17 @@ class Subscription_Checkout {
 		}
 
 		try {
-			$method = 'get_' . str_replace( '_', '', $meta_key );
+			$map = array(
+				'initial_payment' => 'get_total_initial_payment',
+				'price_per_period' => 'get_price_per_period',
+				'sign_up_fee' => 'get_sign_up_fee',
+			);
+
+			if ( ! isset( $map[ $meta_key ] ) ) {
+				return null;
+			}
+
+			$method = $map[ $meta_key ];
 			if ( method_exists( 'WC_Subscriptions_Order', $method ) ) {
 				return call_user_func( array( 'WC_Subscriptions_Order', $method ), $this->customer_order );
 			}
@@ -251,9 +280,12 @@ class Subscription_Checkout {
 	 * @return array
 	 */
 	private function get_headers() {
+		$public_key = trim( (string) $this->gateway->public_key );
+		$secret_key = trim( (string) $this->gateway->secret_key );
+
 		return array(
-			'X-PUBLIC-KEY'  => $this->gateway->public_key,
-			'X-SECRET-KEY'  => $this->gateway->secret_key,
+			'X-PUBLIC-KEY'  => $public_key,
+			'X-SECRET-KEY'  => $secret_key,
 			'X-ORIGIN'      => site_url(),
 			'X-STORE'       => get_bloginfo( 'name' ),
 			'Content-Type'  => 'application/json',

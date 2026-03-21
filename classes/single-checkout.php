@@ -68,6 +68,8 @@ class Single_Checkout {
             }
 
             $error_message = isset( $body->error ) ? $body->error : ( isset( $body->message ) ? $body->message : __( 'Error al crear checkout.', 'epicpay' ) );
+            $public_preview = substr( (string) $this->gateway->public_key, 0, 8 );
+            error_log( 'EpicPay Single_Checkout API Error (HTTP ' . $this->code . '): ' . $error_message . ' | pk=' . $public_preview . '...' );
             return new WP_Error( 'epicpay_checkout_create_failed', $error_message );
 
         } catch (Exception $e) {
@@ -158,9 +160,12 @@ class Single_Checkout {
     }
 
     private function get_headers() {
+        $public_key = trim( (string) $this->gateway->public_key );
+        $secret_key = trim( (string) $this->gateway->secret_key );
+
         return array(
-            'X-PUBLIC-KEY' => $this->gateway->public_key,
-            'X-SECRET-KEY' => $this->gateway->secret_key,
+            'X-PUBLIC-KEY' => $public_key,
+            'X-SECRET-KEY' => $secret_key,
             'X-ORIGIN' => site_url(),
             'X-STORE' => get_bloginfo( 'name' ),
             'Content-Type' => 'application/json',

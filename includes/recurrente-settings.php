@@ -33,6 +33,13 @@ class EpicPaySettings
               'desc_tip'  => __( 'Descripcion a mostrar en el checkout.', 'epicpay' ),
               'default'  => __( 'Procesa tu pago a traves de EpicPay', 'epicpay' )
             ),
+            'enable_subscriptions' => array(
+              'title'    => __( 'Compatibilidad con suscripciones', 'epicpay' ),
+              'label'    => __( 'Activar compatibilidad con WooCommerce Subscriptions', 'epicpay' ),
+              'type'     => 'checkbox',
+              'default'  => 'yes',
+              'desc_tip' => __( 'Opcional: desactiva esta opción si quieres que EpicPay solo procese pagos de una sola vez.', 'epicpay' ),
+            ),
             'environment' => array(
               'title'       => __( 'Entorno', 'epicpay' ),
               'type'        => 'select',
