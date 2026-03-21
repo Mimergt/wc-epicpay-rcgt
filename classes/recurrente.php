@@ -435,9 +435,9 @@ class EpicPay extends WC_Payment_Gateway {
 
     $event = sanitize_text_field( $raw_event );
     $this->log_message( 'info', 'EpicPay webhook received: event=' . $event );
+    $this->maybe_cache_tokenization_from_webhook( $event, $data );
 
     if ( 'setup_intent.succeeded' === $event ) {
-      $this->handle_setup_intent_webhook( $data );
       status_header( 200 );
       exit;
     }
@@ -457,13 +457,54 @@ class EpicPay extends WC_Payment_Gateway {
   * @return void
   */
   private function handle_setup_intent_webhook( $data ) {
+    $this->maybe_cache_tokenization_from_webhook( 'setup_intent.succeeded', $data );
+  }
+
+  /**
+  * Intenta cachear payment_method de tokenización desde distintos eventos webhook.
+  *
+  * @param string $event Nombre del evento.
+  * @param object $data Payload webhook.
+  * @return void
+  */
+  private function maybe_cache_tokenization_from_webhook( $event, $data ) {
+    if ( ! is_object( $data ) ) {
+      return;
+    }
+
     $checkout_id = '';
     if ( isset( $data->checkout ) && is_object( $data->checkout ) && isset( $data->checkout->id ) ) {
       $checkout_id = (string) $data->checkout->id;
     } elseif ( isset( $data->checkout_id ) ) {
       $checkout_id = (string) $data->checkout_id;
+    } elseif ( isset( $data->data ) && is_object( $data->data ) ) {
+      if ( isset( $data->data->checkout ) && is_object( $data->data->checkout ) && isset( $data->data->checkout->id ) ) {
+        $checkout_id = (string) $data->data->checkout->id;
+      } elseif ( isset( $data->data->checkout_id ) ) {
+        $checkout_id = (string) $data->data->checkout_id;
+      }
     }
 
+    $payment_method_data = $this->extract_payment_method_data_from_webhook( $data );
+
+    if ( '' !== $checkout_id && ! empty( $payment_method_data['id'] ) ) {
+      $this->cache_tokenization_payment_method( $checkout_id, $payment_method_data );
+      $this->log_message( 'info', 'EpicPay webhook cached payment method: event=' . $event . ' checkout=' . $checkout_id );
+      return;
+    }
+
+    if ( 'setup_intent.succeeded' === $event ) {
+      $this->log_message( 'warning', 'EpicPay setup_intent webhook received without enough data (checkout/payment_method).' );
+    }
+  }
+
+  /**
+  * Extrae payment_method desde payload webhook con formatos variables.
+  *
+  * @param object $data Payload webhook.
+  * @return array
+  */
+  private function extract_payment_method_data_from_webhook( $data ) {
     $payment_method_data = array(
       'id' => '',
       'last4' => '0000',
@@ -473,31 +514,67 @@ class EpicPay extends WC_Payment_Gateway {
       'payment_intent_id' => '',
     );
 
+    $read_card = static function( $card, &$target ) {
+      if ( ! is_object( $card ) ) {
+        return;
+      }
+      $target['last4'] = isset( $card->last4 ) ? (string) $card->last4 : $target['last4'];
+      $target['brand'] = isset( $card->network ) ? (string) $card->network : $target['brand'];
+      $target['exp_month'] = isset( $card->exp_month ) ? (int) $card->exp_month : $target['exp_month'];
+      $target['exp_year'] = isset( $card->exp_year ) ? (int) $card->exp_year : $target['exp_year'];
+    };
+
     if ( isset( $data->payment_method ) ) {
       if ( is_object( $data->payment_method ) && isset( $data->payment_method->id ) ) {
         $payment_method_data['id'] = (string) $data->payment_method->id;
-        if ( isset( $data->payment_method->card ) && is_object( $data->payment_method->card ) ) {
-          $payment_method_data['last4'] = isset( $data->payment_method->card->last4 ) ? (string) $data->payment_method->card->last4 : '0000';
-          $payment_method_data['brand'] = isset( $data->payment_method->card->network ) ? (string) $data->payment_method->card->network : 'card';
-          $payment_method_data['exp_month'] = isset( $data->payment_method->card->exp_month ) ? (int) $data->payment_method->card->exp_month : 12;
-          $payment_method_data['exp_year'] = isset( $data->payment_method->card->exp_year ) ? (int) $data->payment_method->card->exp_year : ( (int) gmdate( 'Y' ) + 5 );
+        if ( isset( $data->payment_method->card ) ) {
+          $read_card( $data->payment_method->card, $payment_method_data );
         }
       } elseif ( is_string( $data->payment_method ) ) {
         $payment_method_data['id'] = (string) $data->payment_method;
       }
     }
 
+    if ( empty( $payment_method_data['id'] ) && isset( $data->setup_intent ) && is_object( $data->setup_intent ) ) {
+      if ( isset( $data->setup_intent->payment_method ) && is_object( $data->setup_intent->payment_method ) && isset( $data->setup_intent->payment_method->id ) ) {
+        $payment_method_data['id'] = (string) $data->setup_intent->payment_method->id;
+        if ( isset( $data->setup_intent->payment_method->card ) ) {
+          $read_card( $data->setup_intent->payment_method->card, $payment_method_data );
+        }
+      } elseif ( isset( $data->setup_intent->payment_method ) && is_string( $data->setup_intent->payment_method ) ) {
+        $payment_method_data['id'] = (string) $data->setup_intent->payment_method;
+      } elseif ( isset( $data->setup_intent->payment_method_id ) ) {
+        $payment_method_data['id'] = (string) $data->setup_intent->payment_method_id;
+      }
+    }
+
+    if ( empty( $payment_method_data['id'] ) && isset( $data->payment_intent ) && is_object( $data->payment_intent ) ) {
+      if ( isset( $data->payment_intent->payment_method ) && is_object( $data->payment_intent->payment_method ) && isset( $data->payment_intent->payment_method->id ) ) {
+        $payment_method_data['id'] = (string) $data->payment_intent->payment_method->id;
+      } elseif ( isset( $data->payment_intent->payment_method ) && is_string( $data->payment_intent->payment_method ) ) {
+        $payment_method_data['id'] = (string) $data->payment_intent->payment_method;
+      } elseif ( isset( $data->payment_intent->payment_method_id ) ) {
+        $payment_method_data['id'] = (string) $data->payment_intent->payment_method_id;
+      }
+    }
+
+    if ( empty( $payment_method_data['id'] ) && isset( $data->payment ) && is_object( $data->payment ) ) {
+      if ( isset( $data->payment->payment_method ) && is_object( $data->payment->payment_method ) && isset( $data->payment->payment_method->id ) ) {
+        $payment_method_data['id'] = (string) $data->payment->payment_method->id;
+      } elseif ( isset( $data->payment->payment_method ) && is_string( $data->payment->payment_method ) ) {
+        $payment_method_data['id'] = (string) $data->payment->payment_method;
+      } elseif ( isset( $data->payment->payment_method_id ) ) {
+        $payment_method_data['id'] = (string) $data->payment->payment_method_id;
+      }
+    }
+
     if ( isset( $data->id ) && 0 === strpos( (string) $data->id, 'pa_' ) ) {
       $payment_method_data['payment_intent_id'] = (string) $data->id;
+    } elseif ( isset( $data->payment_intent ) && is_object( $data->payment_intent ) && isset( $data->payment_intent->id ) && 0 === strpos( (string) $data->payment_intent->id, 'pa_' ) ) {
+      $payment_method_data['payment_intent_id'] = (string) $data->payment_intent->id;
     }
 
-    if ( '' !== $checkout_id && '' !== $payment_method_data['id'] ) {
-      $this->cache_tokenization_payment_method( $checkout_id, $payment_method_data );
-      $this->log_message( 'info', 'EpicPay setup_intent webhook cached payment method for checkout=' . $checkout_id );
-      return;
-    }
-
-    $this->log_message( 'warning', 'EpicPay setup_intent webhook received without enough data (checkout/payment_method).' );
+    return $payment_method_data;
   }
 
   /**
@@ -692,8 +769,19 @@ class EpicPay extends WC_Payment_Gateway {
       exit;
     }
 
+    $redirect_query_keys = isset( $_GET ) && is_array( $_GET ) ? array_keys( wp_unslash( $_GET ) ) : array();
+    $this->log_message( 'info', 'EpicPay tokenization redirect received: status=' . $status . ' keys=' . implode( ',', $redirect_query_keys ) );
+
     $pending_checkout_id = (string) get_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id', true );
     $requires_refund = 'yes' === (string) get_user_meta( $user_id, 'epicpay_pending_tokenization_requires_refund', true );
+
+    if ( empty( $pending_checkout_id ) ) {
+      if ( isset( $_GET['checkout_id'] ) ) {
+        $pending_checkout_id = sanitize_text_field( wp_unslash( $_GET['checkout_id'] ) );
+      } elseif ( isset( $_GET['checkout'] ) ) {
+        $pending_checkout_id = sanitize_text_field( wp_unslash( $_GET['checkout'] ) );
+      }
+    }
 
     if ( 1 !== $status ) {
       delete_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id' );
@@ -713,6 +801,31 @@ class EpicPay extends WC_Payment_Gateway {
     }
 
     $cached_payment_method_data = $this->get_cached_tokenization_payment_method( $pending_checkout_id );
+    if ( empty( $cached_payment_method_data['id'] ) ) {
+      $query_payment_method_id = '';
+      if ( isset( $_GET['payment_method_id'] ) ) {
+        $query_payment_method_id = sanitize_text_field( wp_unslash( $_GET['payment_method_id'] ) );
+      } elseif ( isset( $_GET['payment_method'] ) ) {
+        $query_payment_method_id = sanitize_text_field( wp_unslash( $_GET['payment_method'] ) );
+      }
+
+      if ( ! empty( $query_payment_method_id ) ) {
+        $cached_payment_method_data = array(
+          'id' => $query_payment_method_id,
+          'last4' => '0000',
+          'brand' => 'card',
+          'exp_month' => 12,
+          'exp_year' => ( (int) gmdate( 'Y' ) + 5 ),
+          'payment_intent_id' => '',
+        );
+
+        if ( ! empty( $pending_checkout_id ) ) {
+          $this->cache_tokenization_payment_method( $pending_checkout_id, $cached_payment_method_data );
+        }
+
+        $this->log_message( 'info', 'EpicPay tokenization redirect supplied payment_method_id directly.' );
+      }
+    }
     $checkout = $this->get_checkout_by_id( $pending_checkout_id, 20 );
     if ( is_wp_error( $checkout ) ) {
       if ( empty( $cached_payment_method_data['id'] ) ) {
