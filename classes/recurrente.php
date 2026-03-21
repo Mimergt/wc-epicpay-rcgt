@@ -434,6 +434,7 @@ class EpicPay extends WC_Payment_Gateway {
     }
 
     $event = sanitize_text_field( $raw_event );
+    $this->log_message( 'info', 'EpicPay webhook received: event=' . $event );
 
     if ( 'setup_intent.succeeded' === $event ) {
       $this->handle_setup_intent_webhook( $data );
@@ -712,7 +713,7 @@ class EpicPay extends WC_Payment_Gateway {
     }
 
     $cached_payment_method_data = $this->get_cached_tokenization_payment_method( $pending_checkout_id );
-    $checkout = $this->get_checkout_by_id( $pending_checkout_id, 6 );
+    $checkout = $this->get_checkout_by_id( $pending_checkout_id, 20 );
     if ( is_wp_error( $checkout ) ) {
       if ( empty( $cached_payment_method_data['id'] ) ) {
         $this->log_message( 'error', 'EpicPay tokenization checkout fetch failed: ' . $checkout->get_error_message() );
@@ -1000,17 +1001,41 @@ class EpicPay extends WC_Payment_Gateway {
         continue;
       }
 
-      $payment_method_probe = $this->extract_payment_method_data( $body );
+      $checkout_data = $this->normalize_checkout_response( $body );
+      $payment_method_probe = $this->extract_payment_method_data( $checkout_data );
       if ( ! empty( $payment_method_probe['id'] ) ) {
-        return $body;
+        return $checkout_data;
       }
 
       if ( $i < $attempts ) {
-        usleep( 350000 );
+        usleep( 750000 );
       }
     }
 
     return new WP_Error( 'epicpay_checkout_fetch_failed', __( 'No se pudo confirmar el método de pago tokenizado en Recurrente.', 'epicpay' ) );
+  }
+
+  /**
+  * Normaliza la respuesta de checkout para contemplar variantes de shape.
+  *
+  * @param array $body Body response decodificado.
+  * @return array
+  */
+  private function normalize_checkout_response( $body ) {
+    if ( isset( $body['checkout'] ) && is_array( $body['checkout'] ) ) {
+      return $body['checkout'];
+    }
+
+    if ( isset( $body['data'] ) && is_array( $body['data'] ) ) {
+      if ( isset( $body['data']['checkout'] ) && is_array( $body['data']['checkout'] ) ) {
+        return $body['data']['checkout'];
+      }
+
+      // Algunos endpoints responden directamente en data.
+      return $body['data'];
+    }
+
+    return $body;
   }
 
   /**
@@ -1024,12 +1049,28 @@ class EpicPay extends WC_Payment_Gateway {
 
     if ( isset( $checkout['payment_method'] ) && is_array( $checkout['payment_method'] ) ) {
       $payment_method = $checkout['payment_method'];
+    } elseif ( isset( $checkout['payment_method'] ) && ! is_array( $checkout['payment_method'] ) ) {
+      $payment_method['id'] = (string) $checkout['payment_method'];
     } elseif ( isset( $checkout['setup_intent']['payment_method'] ) && is_array( $checkout['setup_intent']['payment_method'] ) ) {
       $payment_method = $checkout['setup_intent']['payment_method'];
+    } elseif ( isset( $checkout['setup_intent']['payment_method'] ) && ! is_array( $checkout['setup_intent']['payment_method'] ) ) {
+      $payment_method['id'] = (string) $checkout['setup_intent']['payment_method'];
     }
 
     if ( empty( $payment_method['id'] ) && isset( $checkout['payment_method_id'] ) ) {
       $payment_method['id'] = $checkout['payment_method_id'];
+    }
+
+    if ( empty( $payment_method['id'] ) && isset( $checkout['setup_intent']['payment_method_id'] ) ) {
+      $payment_method['id'] = (string) $checkout['setup_intent']['payment_method_id'];
+    }
+
+    if ( empty( $payment_method['id'] ) && isset( $checkout['payment_intent']['payment_method_id'] ) ) {
+      $payment_method['id'] = (string) $checkout['payment_intent']['payment_method_id'];
+    }
+
+    if ( empty( $payment_method['id'] ) && isset( $checkout['payment']['payment_method_id'] ) ) {
+      $payment_method['id'] = (string) $checkout['payment']['payment_method_id'];
     }
 
     // Algunos responses incluyen payment_intent.payment_method
