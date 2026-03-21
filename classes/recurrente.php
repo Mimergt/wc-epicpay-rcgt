@@ -114,6 +114,13 @@ class EpicPay extends WC_Payment_Gateway {
 
     if ( 1 === $status_id ) {
       $redirect_url = $order->get_checkout_order_received_url();
+      if ( $order->has_status( array( 'pending', 'failed', 'on-hold' ) ) ) {
+        $order->payment_complete();
+
+        if ( ! empty( $this->order_status ) && 'wc-completed' !== $this->order_status ) {
+          $order->update_status( str_replace( 'wc-', '', $this->order_status ) );
+        }
+      }
       $order->add_order_note( 'EpicPay: La transaccion fue completada por el usuario.' );
       wp_safe_redirect( $redirect_url );
       exit;
@@ -121,6 +128,9 @@ class EpicPay extends WC_Payment_Gateway {
       $checkout_url = add_query_arg( [
         'cancel' => 'true',
       ], wc_get_checkout_url() );
+      if ( $order->has_status( array( 'pending', 'on-hold' ) ) ) {
+        $order->update_status( 'cancelled' );
+      }
       $order->add_order_note( 'EpicPay: La transaccion fue cancelada por el usuario.' );
       wp_safe_redirect( $checkout_url );
       exit;
