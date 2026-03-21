@@ -88,8 +88,60 @@ class EpicPay extends WC_Payment_Gateway {
     add_action( 'woocommerce_api_epicpay', array( $this, 'redirect_callback' ) );
     if ( is_admin() ) {
       add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
+      add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_settings_visibility_script' ) );
     }  
   }  
+
+  /**
+  * Muestra/Oculta campos de llaves segun el entorno seleccionado.
+  */
+  public function enqueue_settings_visibility_script() {
+    if ( ! isset( $_GET['page'], $_GET['section'] ) ) {
+      return;
+    }
+
+    $page = sanitize_text_field( wp_unslash( $_GET['page'] ) );
+    $section = sanitize_text_field( wp_unslash( $_GET['section'] ) );
+
+    if ( 'wc-settings' !== $page || $this->id !== $section ) {
+      return;
+    }
+
+    $script = "jQuery(function($){
+      function toggleEpicPayFields(){
+        var env = $('#woocommerce_epicpay_environment').val();
+        var sandboxFields = [
+          '#woocommerce_epicpay_sandbox_public_key',
+          '#woocommerce_epicpay_sandbox_secret_key'
+        ];
+        var liveFields = [
+          '#woocommerce_epicpay_live_public_key',
+          '#woocommerce_epicpay_live_secret_key'
+        ];
+        var legacyFields = [
+          '#woocommerce_epicpay_public_key',
+          '#woocommerce_epicpay_secret_key'
+        ];
+
+        sandboxFields.forEach(function(selector){
+          $(selector).closest('tr').toggle(env === 'sandbox');
+        });
+
+        liveFields.forEach(function(selector){
+          $(selector).closest('tr').toggle(env === 'live');
+        });
+
+        legacyFields.forEach(function(selector){
+          $(selector).closest('tr').hide();
+        });
+      }
+
+      $('#woocommerce_epicpay_environment').on('change', toggleEpicPayFields);
+      toggleEpicPayFields();
+    });";
+
+    wp_add_inline_script( 'jquery', $script );
+  }
 
   /**
   * Función encargada de inicializar el formulario de configuración del pugin
