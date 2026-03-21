@@ -33,15 +33,45 @@ class EpicPaySettings
               'desc_tip'  => __( 'Descripcion a mostrar en el checkout.', 'epicpay' ),
               'default'  => __( 'Procesa tu pago a traves de EpicPay', 'epicpay' )
             ),
+            'environment' => array(
+              'title'       => __( 'Entorno', 'epicpay' ),
+              'type'        => 'select',
+              'description' => __( 'Selecciona si usaras llaves de pruebas (sandbox) o produccion (live).', 'epicpay' ),
+              'options'     => array(
+                'sandbox' => __( 'Sandbox (pruebas)', 'epicpay' ),
+                'live'    => __( 'Live (produccion)', 'epicpay' ),
+              ),
+              'default'     => 'sandbox',
+            ),
+            'sandbox_public_key' => array(
+              'title'    => __( 'Clave publica sandbox', 'epicpay' ),
+              'type'     => 'text',
+              'desc_tip' => __( 'Llave publica para pruebas (test).', 'epicpay' ),
+            ),
+            'sandbox_secret_key' => array(
+              'title'    => __( 'Clave secreta sandbox', 'epicpay' ),
+              'type'     => 'text',
+              'desc_tip' => __( 'Llave secreta para pruebas (test).', 'epicpay' ),
+            ),
+            'live_public_key' => array(
+              'title'    => __( 'Clave publica live', 'epicpay' ),
+              'type'     => 'text',
+              'desc_tip' => __( 'Llave publica para produccion.', 'epicpay' ),
+            ),
+            'live_secret_key' => array(
+              'title'    => __( 'Clave secreta live', 'epicpay' ),
+              'type'     => 'text',
+              'desc_tip' => __( 'Llave secreta para produccion.', 'epicpay' ),
+            ),
             'public_key' => array(
-              'title'    => __( 'Clave publica', 'epicpay' ),
+              'title'    => __( 'Clave publica (legado)', 'epicpay' ),
               'type'    => 'text',
-              'desc_tip'  => __( 'Esta llave la puedes encontrar en el portal de Recurrente en el area de Desarrolladores y API.', 'epicpay' ),
+              'desc_tip'  => __( 'Campo legacy para compatibilidad con configuraciones anteriores.', 'epicpay' ),
             ),
             'secret_key' => array(
-              'title'    => __( 'Clave secreta', 'epicpay' ),
+              'title'    => __( 'Clave secreta (legado)', 'epicpay' ),
               'type'    => 'text',
-              'desc_tip'  => __( 'Esta llave la puedes encontrar en el portal de Recurrente en el area de Desarrolladores y API.', 'epicpay' ),
+              'desc_tip'  => __( 'Campo legacy para compatibilidad con configuraciones anteriores.', 'epicpay' ),
             ),
             'allow_transfer' => array(
               'title'    => __( 'Habilitar transferencia bancaria', 'epicpay' ),

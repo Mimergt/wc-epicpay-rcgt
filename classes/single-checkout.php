@@ -159,8 +159,8 @@ class Single_Checkout {
 
     private function get_headers() {
         return array(
-            'X-PUBLIC-KEY' => $this->gateway->get_option( 'public_key' ),
-            'X-SECRET-KEY' => $this->gateway->get_option( 'secret_key' ),
+            'X-PUBLIC-KEY' => $this->gateway->public_key,
+            'X-SECRET-KEY' => $this->gateway->secret_key,
             'X-ORIGIN' => site_url(),
             'X-STORE' => get_bloginfo( 'name' ),
             'Content-Type' => 'application/json',
