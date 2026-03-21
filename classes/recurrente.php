@@ -64,6 +64,16 @@ class EpicPay extends WC_Payment_Gateway {
   }
 
   /**
+  * Devuelve el estado configurado sin prefijo wc-.
+  *
+  * @return string
+  */
+  private function get_configured_order_status_slug() {
+    $configured_status = ! empty( $this->order_status ) ? $this->order_status : 'wc-completed';
+    return str_replace( 'wc-', '', $configured_status );
+  }
+
+  /**
   * Función para patron de singleton
   * 
   * @author Mimer
@@ -108,6 +118,55 @@ class EpicPay extends WC_Payment_Gateway {
     }
 
     $script = "jQuery(function($){
+      var keyFields = [
+        '#woocommerce_epicpay_sandbox_public_key',
+        '#woocommerce_epicpay_sandbox_secret_key',
+        '#woocommerce_epicpay_live_public_key',
+        '#woocommerce_epicpay_live_secret_key',
+        '#woocommerce_epicpay_public_key',
+        '#woocommerce_epicpay_secret_key'
+      ];
+
+      function maskEpicPayValue(value){
+        if (!value) {
+          return '';
+        }
+
+        if (value.length <= 8) {
+          return value;
+        }
+
+        return value.substring(0, 4) + '********' + value.substring(value.length - 4);
+      }
+
+      function initializeMaskedField(selector){
+        var field = $(selector);
+        if (!field.length) {
+          return;
+        }
+
+        var rawValue = field.val();
+        field.attr('data-epicpay-full-value', rawValue);
+
+        if (rawValue) {
+          field.val(maskEpicPayValue(rawValue));
+        }
+
+        field.on('focus', function(){
+          $(this).val($(this).attr('data-epicpay-full-value') || '');
+        });
+
+        field.on('input', function(){
+          $(this).attr('data-epicpay-full-value', $(this).val());
+        });
+
+        field.on('blur', function(){
+          var latestValue = $(this).val();
+          $(this).attr('data-epicpay-full-value', latestValue);
+          $(this).val(maskEpicPayValue(latestValue));
+        });
+      }
+
       function toggleEpicPayFields(){
         var env = $('#woocommerce_epicpay_environment').val();
         var sandboxFields = [
@@ -136,7 +195,16 @@ class EpicPay extends WC_Payment_Gateway {
         });
       }
 
+      keyFields.forEach(initializeMaskedField);
       $('#woocommerce_epicpay_environment').on('change', toggleEpicPayFields);
+      $('#mainform').on('submit', function(){
+        keyFields.forEach(function(selector){
+          var field = $(selector);
+          if (field.length) {
+            field.val(field.attr('data-epicpay-full-value') || '');
+          }
+        });
+      });
       toggleEpicPayFields();
     });";
 
@@ -192,8 +260,9 @@ class EpicPay extends WC_Payment_Gateway {
       if ( $order->has_status( array( 'pending', 'failed', 'on-hold' ) ) ) {
         $order->payment_complete();
 
-        if ( ! empty( $this->order_status ) && 'wc-completed' !== $this->order_status ) {
-          $order->update_status( str_replace( 'wc-', '', $this->order_status ) );
+        $configured_status = $this->get_configured_order_status_slug();
+        if ( $order->get_status() !== $configured_status ) {
+          $order->update_status( $configured_status );
         }
       }
       $order->add_order_note( 'EpicPay: La transaccion fue completada por el usuario.' );
