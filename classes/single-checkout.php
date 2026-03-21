@@ -1,0 +1,147 @@
+<?php
+/**
+* Clase para interactuar con un Checkou de Cobro único dentro de Recurrente
+*
+* Objeto principal para interactuar con un checkout de Cobro único dentro de recurrente.
+*
+* @copyright  2024 - tipi(code)
+* @since      2.0.1
+*/ 
+class Single_Checkout {
+    private $gateway;
+    private $customer_order;
+    public $id;
+    public $url;
+    public $product;
+    public $code;
+
+    /**
+    * Constructor
+    *
+    * @param WC_Order  $customer_order  Orden de WooCommerce para procesar los datos del producto.
+    * 
+    */ 
+    function __construct($customer_order) {
+        $this->gateway = EpicPay::get_instance();
+        $this->customer_order = $customer_order;
+    }
+
+    /**
+    * Crea un nuevo Checkout de cobro único
+    * 
+    * @throws Exception Si la llamada a recurrente falla
+    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @return string HTTP Response Code de la llamada
+    * @link https://codingtipi.com/project/recurrente
+    * @since 2.0.0
+    */
+    public function create(){
+        try{
+            $url = trailingslashit( $this->get_api_base_url() ) . 'checkouts';
+            $checkout = $this->get_api_model();//Obtiene objeto en formato JSON como lo requiere Recurrente
+            $response = wp_remote_post(
+                $url,
+                array(
+                    'headers' => $this->get_headers(),
+                    'body' => wp_json_encode( $checkout ),
+                    'timeout' => 30,
+                )
+            );
+
+            if ( is_wp_error( $response ) ) {
+                return $response;
+            }
+
+            $this->code = (int) wp_remote_retrieve_response_code( $response );
+            $body = json_decode( wp_remote_retrieve_body( $response ) );
+
+            if($this->code == 201){
+                $this->id = isset( $body->id ) ? $body->id : null;
+                $this->product = isset( $body->product ) ? $body->product : null;
+                $this->url = isset( $body->url ) ? $body->url : null;
+            }else{
+                return isset( $body->message ) ? $body->message : __( 'Error al crear checkout.', 'epicpay' );
+            }
+
+        } catch (Exception $e) {
+			return new WP_Error('error', $e->getMessage());
+		}
+    }
+
+    /**
+    * Elimina un producto de la biblioteca de Recurrente
+    * 
+    * @throws Exception Si la llamada a recurrente falla
+    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @return string HTTP Response Code de la llamada
+    * @link https://codingtipi.com/project/recurrente
+    * @since 2.0.0
+    */
+    public function clean(){
+        try{
+            $url = trailingslashit( $this->get_api_base_url() ) . 'products/' . $this->id;
+            $response = wp_remote_request(
+                $url,
+                array(
+                    'method' => 'DELETE',
+                    'headers' => $this->get_headers(),
+                    'timeout' => 30,
+                )
+            );
+
+            if ( is_wp_error( $response ) ) {
+                return $response;
+            }
+
+            return (int) wp_remote_retrieve_response_code( $response );
+
+        } catch (Exception $e) {
+			return new WP_Error('error', $e->getMessage());
+		}
+    }
+
+    /**
+    * Obtiene el modelo de un checkout para poder interactual con el API de recurrente
+    * 
+    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Franco A. Cabrera <francocabreradev@gmail.com>
+    * @return Array Objeto para usar con el API de Recurrente
+    * @link https://codingtipi.com/project/recurrente
+    * @since 2.0.1
+    */ 
+    private function get_api_model(){
+        $installments = !empty( $this->gateway->get_option('installments')) ? str_replace(' Meses', '', join(',', $this->gateway->get_option('installments'))) : '';
+        $transfers = $this->gateway->get_option('allow_transfer') == 'yes' ? true : false;
+
+        return Array(
+                "number"  => $this->customer_order->get_id(), // ex get_order_number()
+                "description"  => "Orden número ".$this->customer_order->get_order_number().'. al finalizar tu pago seras redirigido de vuelta al comerció para procesar tu orden.',
+                "correlative"  => $this->customer_order->get_id(),
+                "amount" => $this->customer_order->get_total(),
+                "currency"  => $this->customer_order->get_currency(),
+                "allowTransfer"  => $transfers,
+                "installments"  => $installments,
+                "billing" => Array(
+                    "name" => $this->customer_order->get_billing_first_name(),
+                    "surname" => $this->customer_order->get_billing_last_name(),
+                    "email" => $this->customer_order->get_billing_email(),
+                    "phone" => $this->customer_order->get_billing_phone()
+                )
+        );
+    }
+
+    private function get_api_base_url() {
+        $default_base_url = 'https://app.recurrente.com/api';
+        return untrailingslashit( apply_filters( 'epicpay_api_base_url', $default_base_url ) );
+    }
+
+    private function get_headers() {
+        return array(
+            'X-PUBLIC-KEY' => $this->gateway->get_option( 'public_key' ),
+            'X-SECRET-KEY' => $this->gateway->get_option( 'secret_key' ),
+            'X-ORIGIN' => site_url(),
+            'X-STORE' => get_bloginfo( 'name' ),
+            'Content-Type' => 'application/json',
+        );
+    }
+}
