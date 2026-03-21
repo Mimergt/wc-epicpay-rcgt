@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.1.3
+Stable tag: 2.1.4
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,11 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.1.4 =
+* Fix crítico en guardado de tarjeta: se acepta webhook de tokenización con `event_type` o `type` y se procesa `setup_intent.succeeded` para capturar `payment_method_id` aunque el callback no lo reciba inmediatamente.
+* Se agrega cache temporal por `checkout_id` con fallback en el retorno de tokenización para confirmar y guardar el método de pago aun con latencia de propagación.
+* El flujo de micro-cobro usa `payment_intent_id` del cache (cuando aplica) para mejorar la tasa de reembolso automático.
 
 = 2.1.3 =
 * Fix en retorno de tokenización: extracción de `payment_method_id` robusta desde múltiples estructuras de respuesta de Recurrente (`payment_intent`, `payment`, `setup_intent`).
