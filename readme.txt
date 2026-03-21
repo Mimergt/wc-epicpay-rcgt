@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.0.7
+Stable tag: 2.1.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,13 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.1.0 =
+* Nueva funcionalidad: guardar tarjeta del cliente desde Mi cuenta > Métodos de pago usando checkout de tokenización (monto 0) en Recurrente.
+* Se agrega soporte `tokenization` y `add_payment_method` en el gateway EpicPay.
+* Nuevo callback para tokenización que consulta `GET /api/checkouts/{id}` y guarda el `payment_method_id` como token de WooCommerce.
+* Se establece la tarjeta guardada como método predeterminado del cliente dentro de WooCommerce.
+* Backup creado antes de esta versión: rama `backup-2-0-7-estado-ok` y tag `backup-v2.0.7-estado-ok`.
 
 = 2.0.7 =
 * Se eliminó el enmascarado de llaves API en la pantalla de configuración para evitar guardar valores con asteriscos.

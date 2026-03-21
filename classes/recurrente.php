@@ -36,6 +36,8 @@ class EpicPay extends WC_Payment_Gateway {
     // Define subscription support
     $this->supports = array(
       'products',
+      'tokenization',
+      'add_payment_method',
       'subscriptions',
       'subscription_cancellation',
       'subscription_suspension',
@@ -348,7 +350,9 @@ class EpicPay extends WC_Payment_Gateway {
   * @since 1.2.0
   */
   public function redirect_callback(){
-    if ( isset( $_GET['status'] ) ) {
+    if ( isset( $_GET['tokenize'] ) ) {
+      $this->answer_tokenization_redirect();
+    } elseif ( isset( $_GET['status'] ) ) {
       $this->answer_redirect(); //Esto quiere decir que es el redirect URL del checkout
     } else {
       $this->process_webhook(); //Esto quiere decir que es el Webhook
@@ -506,6 +510,313 @@ class EpicPay extends WC_Payment_Gateway {
     return array(
       'result'   => 'success',
       'redirect' => $checkout->url,
+    );
+  }
+
+  /**
+  * Flujo de WooCommerce "Añadir método de pago" (My Account).
+  * Crea un checkout de tokenización en Recurrente con monto 0.
+  *
+  * @return array
+  */
+  public function add_payment_method() {
+    $user_id = get_current_user_id();
+    if ( ! $user_id ) {
+      wc_add_notice( __( 'Debes iniciar sesión para guardar una tarjeta.', 'epicpay' ), 'error' );
+      return array( 'result' => 'failure' );
+    }
+
+    $credentials_error = $this->validate_active_credentials();
+    if ( is_wp_error( $credentials_error ) ) {
+      $this->log_message( 'error', 'EpicPay add_payment_method credentials error: ' . $credentials_error->get_error_message() );
+      wc_add_notice( $credentials_error->get_error_message(), 'error' );
+      return array( 'result' => 'failure' );
+    }
+
+    $url = trailingslashit( $this->get_api_base_url() ) . 'checkouts';
+    $payload = $this->get_tokenization_checkout_payload( $user_id );
+
+    $response = wp_remote_post(
+      $url,
+      array(
+        'headers' => $this->get_api_headers(),
+        'body' => wp_json_encode( $payload ),
+        'timeout' => 30,
+      )
+    );
+
+    if ( is_wp_error( $response ) ) {
+      $this->log_message( 'error', 'EpicPay tokenization checkout request failed: ' . $response->get_error_message() );
+      wc_add_notice( __( 'No se pudo iniciar el guardado de tarjeta.', 'epicpay' ), 'error' );
+      return array( 'result' => 'failure' );
+    }
+
+    $code = (int) wp_remote_retrieve_response_code( $response );
+    $body_raw = wp_remote_retrieve_body( $response );
+    $body = json_decode( $body_raw, true );
+
+    if ( 201 !== $code ) {
+      $message = isset( $body['error'] ) ? $body['error'] : ( isset( $body['message'] ) ? $body['message'] : __( 'Error al iniciar tokenización.', 'epicpay' ) );
+      $this->log_message( 'error', 'EpicPay tokenization checkout API error HTTP ' . $code . ': ' . $message . ' | response=' . $body_raw );
+      wc_add_notice( $message, 'error' );
+      return array( 'result' => 'failure' );
+    }
+
+    $checkout_id = isset( $body['id'] ) ? $body['id'] : '';
+    $checkout_url = isset( $body['checkout_url'] ) ? $body['checkout_url'] : ( isset( $body['url'] ) ? $body['url'] : '' );
+
+    if ( empty( $checkout_id ) || empty( $checkout_url ) ) {
+      $this->log_message( 'error', 'EpicPay tokenization checkout missing id/url. response=' . $body_raw );
+      wc_add_notice( __( 'Recurrente no devolvió datos de checkout para tokenización.', 'epicpay' ), 'error' );
+      return array( 'result' => 'failure' );
+    }
+
+    update_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id', $checkout_id );
+    $this->log_message( 'info', 'EpicPay tokenization checkout created: user=' . $user_id . ' checkout=' . $checkout_id );
+
+    return array(
+      'result' => 'success',
+      'redirect' => $checkout_url,
+    );
+  }
+
+  /**
+  * Callback para retorno de tokenización.
+  * Guarda el payment_method como token de WooCommerce.
+  *
+  * @return void
+  */
+  public function answer_tokenization_redirect() {
+    $status = isset( $_GET['status'] ) ? absint( wp_unslash( $_GET['status'] ) ) : -1;
+    $user_id = isset( $_GET['user_id'] ) ? absint( wp_unslash( $_GET['user_id'] ) ) : get_current_user_id();
+
+    if ( ! $user_id ) {
+      wc_add_notice( __( 'No se pudo identificar el usuario para guardar la tarjeta.', 'epicpay' ), 'error' );
+      wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+      exit;
+    }
+
+    $pending_checkout_id = (string) get_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id', true );
+
+    if ( 1 !== $status ) {
+      delete_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id' );
+      wc_add_notice( __( 'Guardado de tarjeta cancelado por el usuario.', 'epicpay' ), 'notice' );
+      wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+      exit;
+    }
+
+    if ( empty( $pending_checkout_id ) ) {
+      wc_add_notice( __( 'No se encontró una tokenización pendiente.', 'epicpay' ), 'error' );
+      wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+      exit;
+    }
+
+    $checkout = $this->get_checkout_by_id( $pending_checkout_id );
+    if ( is_wp_error( $checkout ) ) {
+      $this->log_message( 'error', 'EpicPay tokenization checkout fetch failed: ' . $checkout->get_error_message() );
+      wc_add_notice( __( 'No se pudo confirmar la tarjeta guardada. Intenta de nuevo.', 'epicpay' ), 'error' );
+      wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+      exit;
+    }
+
+    $payment_method_data = $this->extract_payment_method_data( $checkout );
+    if ( empty( $payment_method_data['id'] ) ) {
+      $this->log_message( 'error', 'EpicPay tokenization missing payment_method_id for checkout=' . $pending_checkout_id );
+      wc_add_notice( __( 'No se recibió el identificador del método de pago desde Recurrente.', 'epicpay' ), 'error' );
+      wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+      exit;
+    }
+
+    $save_result = $this->persist_user_payment_token( $user_id, $payment_method_data );
+    if ( is_wp_error( $save_result ) ) {
+      $this->log_message( 'error', 'EpicPay token save failed: ' . $save_result->get_error_message() );
+      wc_add_notice( $save_result->get_error_message(), 'error' );
+      wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+      exit;
+    }
+
+    delete_user_meta( $user_id, 'epicpay_pending_tokenization_checkout_id' );
+    wc_add_notice( __( 'Tarjeta guardada exitosamente.', 'epicpay' ), 'success' );
+    wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+    exit;
+  }
+
+  /**
+  * Construye payload de checkout para tokenización de tarjeta.
+  *
+  * @param int $user_id Usuario WP.
+  * @return array
+  */
+  private function get_tokenization_checkout_payload( $user_id ) {
+    $currency = get_woocommerce_currency();
+    $success_url = add_query_arg(
+      array(
+        'wc-api' => 'epicpay',
+        'tokenize' => 1,
+        'status' => 1,
+        'user_id' => (int) $user_id,
+      ),
+      home_url( '/' )
+    );
+
+    $cancel_url = add_query_arg(
+      array(
+        'wc-api' => 'epicpay',
+        'tokenize' => 1,
+        'status' => 0,
+        'user_id' => (int) $user_id,
+      ),
+      home_url( '/' )
+    );
+
+    return array(
+      'items' => array(
+        array(
+          'name' => __( 'Guardar método de pago', 'epicpay' ),
+          'currency' => $currency,
+          'amount_in_cents' => 0,
+          'charge_type' => 'one_time',
+          'quantity' => 1,
+        ),
+      ),
+      'user_id' => (string) $user_id,
+      'success_url' => $success_url,
+      'cancel_url' => $cancel_url,
+      'metadata' => array(
+        'source' => 'woocommerce_add_payment_method',
+        'wp_user_id' => (string) $user_id,
+      ),
+    );
+  }
+
+  /**
+  * Consulta checkout por id en Recurrente.
+  *
+  * @param string $checkout_id ID checkout.
+  * @return array|WP_Error
+  */
+  private function get_checkout_by_id( $checkout_id ) {
+    $url = trailingslashit( $this->get_api_base_url() ) . 'checkouts/' . rawurlencode( $checkout_id );
+    $response = wp_remote_get(
+      $url,
+      array(
+        'headers' => $this->get_api_headers(),
+        'timeout' => 30,
+      )
+    );
+
+    if ( is_wp_error( $response ) ) {
+      return $response;
+    }
+
+    $code = (int) wp_remote_retrieve_response_code( $response );
+    $body_raw = wp_remote_retrieve_body( $response );
+    $body = json_decode( $body_raw, true );
+
+    if ( 200 !== $code || ! is_array( $body ) ) {
+      $message = is_array( $body ) && isset( $body['message'] ) ? $body['message'] : __( 'Respuesta inválida al consultar checkout.', 'epicpay' );
+      return new WP_Error( 'epicpay_checkout_fetch_failed', $message );
+    }
+
+    return $body;
+  }
+
+  /**
+  * Extrae payment_method desde respuesta de checkout.
+  *
+  * @param array $checkout Checkout response.
+  * @return array
+  */
+  private function extract_payment_method_data( $checkout ) {
+    $payment_method = array();
+
+    if ( isset( $checkout['payment_method'] ) && is_array( $checkout['payment_method'] ) ) {
+      $payment_method = $checkout['payment_method'];
+    } elseif ( isset( $checkout['setup_intent']['payment_method'] ) && is_array( $checkout['setup_intent']['payment_method'] ) ) {
+      $payment_method = $checkout['setup_intent']['payment_method'];
+    }
+
+    if ( empty( $payment_method['id'] ) && isset( $checkout['payment_method_id'] ) ) {
+      $payment_method['id'] = $checkout['payment_method_id'];
+    }
+
+    $card = isset( $payment_method['card'] ) && is_array( $payment_method['card'] ) ? $payment_method['card'] : array();
+
+    return array(
+      'id' => isset( $payment_method['id'] ) ? (string) $payment_method['id'] : '',
+      'last4' => isset( $card['last4'] ) ? (string) $card['last4'] : '0000',
+      'brand' => isset( $card['network'] ) ? (string) $card['network'] : 'card',
+      'exp_month' => isset( $card['exp_month'] ) ? (int) $card['exp_month'] : 12,
+      'exp_year' => isset( $card['exp_year'] ) ? (int) $card['exp_year'] : ( (int) gmdate( 'Y' ) + 5 ),
+    );
+  }
+
+  /**
+  * Guarda el método de pago tokenizado en WooCommerce.
+  *
+  * @param int $user_id Usuario WP.
+  * @param array $payment_method_data Datos del payment_method.
+  * @return int|WP_Error
+  */
+  private function persist_user_payment_token( $user_id, $payment_method_data ) {
+    if ( ! class_exists( 'WC_Payment_Token_CC' ) ) {
+      return new WP_Error( 'epicpay_wc_token_unavailable', __( 'WooCommerce Payment Token API no está disponible.', 'epicpay' ) );
+    }
+
+    $token_value = isset( $payment_method_data['id'] ) ? (string) $payment_method_data['id'] : '';
+    if ( '' === $token_value ) {
+      return new WP_Error( 'epicpay_token_empty', __( 'No se recibió token de método de pago.', 'epicpay' ) );
+    }
+
+    $existing_tokens = WC_Payment_Tokens::get_customer_tokens( $user_id, $this->id );
+    foreach ( $existing_tokens as $existing_token ) {
+      if ( $existing_token->get_token() === $token_value ) {
+        $existing_token->set_default( true );
+        $existing_token->save();
+        return (int) $existing_token->get_id();
+      }
+    }
+
+    $token = new WC_Payment_Token_CC();
+    $token->set_gateway_id( $this->id );
+    $token->set_token( $token_value );
+    $token->set_user_id( $user_id );
+    $token->set_last4( isset( $payment_method_data['last4'] ) ? $payment_method_data['last4'] : '0000' );
+    $token->set_card_type( isset( $payment_method_data['brand'] ) ? strtolower( $payment_method_data['brand'] ) : 'card' );
+    $token->set_expiry_month( max( 1, min( 12, (int) $payment_method_data['exp_month'] ) ) );
+    $token->set_expiry_year( max( (int) gmdate( 'Y' ), (int) $payment_method_data['exp_year'] ) );
+    $token->set_default( true );
+
+    $token_id = $token->save();
+    if ( ! $token_id ) {
+      return new WP_Error( 'epicpay_token_save_failed', __( 'No se pudo guardar la tarjeta en WooCommerce.', 'epicpay' ) );
+    }
+
+    return (int) $token_id;
+  }
+
+  /**
+  * URL base API Recurrente.
+  *
+  * @return string
+  */
+  private function get_api_base_url() {
+    $default_base_url = 'https://app.recurrente.com/api';
+    return untrailingslashit( apply_filters( 'epicpay_api_base_url', $default_base_url ) );
+  }
+
+  /**
+  * Headers API Recurrente.
+  *
+  * @return array
+  */
+  private function get_api_headers() {
+    return array(
+      'X-PUBLIC-KEY' => trim( (string) $this->public_key ),
+      'X-SECRET-KEY' => trim( (string) $this->secret_key ),
+      'X-ORIGIN' => site_url(),
+      'X-STORE' => get_bloginfo( 'name' ),
+      'Content-Type' => 'application/json',
     );
   }
   
