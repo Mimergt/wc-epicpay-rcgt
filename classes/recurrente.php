@@ -102,6 +102,41 @@ class EpicPay extends WC_Payment_Gateway {
   }
 
   /**
+  * Verifica si el gateway soporta una característica específica
+  * Required by WooCommerce Subscriptions to detect subscription support
+  * 
+  * @param string $feature Característica a verificar (ej: 'subscriptions')
+  * @return bool
+  * @since 2.0.1
+  */
+  public function supports( $feature ) {
+    // Validar que el gateway esté activo y tenga credenciales para suscripciones
+    if ( 'subscriptions' === $feature ) {
+      // Verificar que WC Subscriptions esté activo
+      if ( ! function_exists( 'wcs_is_subscription' ) ) {
+        error_log( 'EpicPay: WC Subscriptions not active' );
+        return false;
+      }
+      
+      // Verificar que tengamos credenciales configuradas
+      if ( empty( $this->public_key ) || empty( $this->secret_key ) ) {
+        error_log( 'EpicPay: Subscriptions support disabled - missing credentials' );
+        return false;
+      }
+      
+      // Verificar que el gateway esté habilitado
+      if ( 'yes' !== $this->enabled ) {
+        error_log( 'EpicPay: Subscriptions support disabled - gateway not enabled' );
+        return false;
+      }
+    }
+    
+    // Usar el array de soporte definido en el constructor
+    return parent::supports( $feature );
+  }
+
+
+  /**
   * Función que inicializa las acciones
   * 
   * @author Mimer
