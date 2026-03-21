@@ -55,13 +55,20 @@ class Single_Checkout {
             $this->code = (int) wp_remote_retrieve_response_code( $response );
             $body = json_decode( wp_remote_retrieve_body( $response ) );
 
-            if($this->code == 201){
+            if ( 201 === $this->code ) {
                 $this->id = isset( $body->id ) ? $body->id : null;
                 $this->product = isset( $body->product ) ? $body->product : null;
-                $this->url = isset( $body->url ) ? $body->url : null;
-            }else{
-                return isset( $body->message ) ? $body->message : __( 'Error al crear checkout.', 'epicpay' );
+                $this->url = isset( $body->checkout_url ) ? $body->checkout_url : ( isset( $body->url ) ? $body->url : null );
+
+                if ( empty( $this->url ) ) {
+                    return new WP_Error( 'epicpay_checkout_url_missing', __( 'Recurrente no devolvio checkout_url.', 'epicpay' ) );
+                }
+
+                return true;
             }
+
+            $error_message = isset( $body->error ) ? $body->error : ( isset( $body->message ) ? $body->message : __( 'Error al crear checkout.', 'epicpay' ) );
+            return new WP_Error( 'epicpay_checkout_create_failed', $error_message );
 
         } catch (Exception $e) {
 			return new WP_Error('error', $e->getMessage());
@@ -110,23 +117,38 @@ class Single_Checkout {
     * @since 2.0.1
     */ 
     private function get_api_model(){
-        $installments = !empty( $this->gateway->get_option('installments')) ? str_replace(' Meses', '', join(',', $this->gateway->get_option('installments'))) : '';
-        $transfers = $this->gateway->get_option('allow_transfer') == 'yes' ? true : false;
+        $amount_in_cents = (int) round( (float) $this->customer_order->get_total() * 100 );
+        $order_id = $this->customer_order->get_id();
 
-        return Array(
-                "number"  => $this->customer_order->get_id(), // ex get_order_number()
-                "description"  => "Orden número ".$this->customer_order->get_order_number().'. al finalizar tu pago seras redirigido de vuelta al comerció para procesar tu orden.',
-                "correlative"  => $this->customer_order->get_id(),
-                "amount" => $this->customer_order->get_total(),
-                "currency"  => $this->customer_order->get_currency(),
-                "allowTransfer"  => $transfers,
-                "installments"  => $installments,
-                "billing" => Array(
-                    "name" => $this->customer_order->get_billing_first_name(),
-                    "surname" => $this->customer_order->get_billing_last_name(),
-                    "email" => $this->customer_order->get_billing_email(),
-                    "phone" => $this->customer_order->get_billing_phone()
-                )
+        return array(
+            'items' => array(
+                array(
+                    'name' => sprintf( 'Orden %s', $this->customer_order->get_order_number() ),
+                    'amount_in_cents' => $amount_in_cents,
+                    'currency' => $this->customer_order->get_currency(),
+                    'quantity' => 1,
+                ),
+            ),
+            'success_url' => add_query_arg(
+                array(
+                    'wc-api' => 'epicpay',
+                    'status' => 1,
+                    'order' => $order_id,
+                ),
+                home_url( '/' )
+            ),
+            'cancel_url' => add_query_arg(
+                array(
+                    'wc-api' => 'epicpay',
+                    'status' => 0,
+                    'order' => $order_id,
+                ),
+                home_url( '/' )
+            ),
+            'metadata' => array(
+                'order_id' => (string) $order_id,
+                'order_number' => (string) $this->customer_order->get_order_number(),
+            ),
         );
     }
 

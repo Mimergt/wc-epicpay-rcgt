@@ -170,10 +170,13 @@ class EpicPay extends WC_Payment_Gateway {
     $checkout_transaction = $single_checkout->create(); 
 
     if ( is_wp_error( $checkout_transaction ) ) {
-      $this->fail( $checkout_transaction->get_error_message() );
+      wc_add_notice( $checkout_transaction->get_error_message(), 'error' );
+      return array( 'result' => 'failure' );
     }
-    if ( $single_checkout->code != 201 ) //Valida el return del status code 
-      $this->fail($checkout_transaction);
+    if ( 201 !== (int) $single_checkout->code || empty( $single_checkout->url ) ) {
+      wc_add_notice( __( 'No se pudo iniciar el checkout con EpicPay.', 'epicpay' ), 'error' );
+      return array( 'result' => 'failure' );
+    }
 
     $customer_order->add_order_note( 'EpicPay: Se inicializo el proceso de pago.' );
     $customer_order->update_meta_data( 'epicpay_checkout_id', $single_checkout->id );
