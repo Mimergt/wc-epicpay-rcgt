@@ -153,6 +153,57 @@ class EpicPay extends WC_Payment_Gateway {
   }
 
   /**
+  * Logger centralizado para WooCommerce logs con source epicpay.
+  *
+  * @param string $level Nivel de log (debug|info|warning|error).
+  * @param string $message Mensaje.
+  * @return void
+  */
+  private function log_message( $level, $message ) {
+    if ( function_exists( 'wc_get_logger' ) ) {
+      $logger = wc_get_logger();
+      $logger->log( $level, $message, array( 'source' => 'epicpay' ) );
+      return;
+    }
+
+    error_log( 'EpicPay [' . strtoupper( $level ) . '] ' . $message );
+  }
+
+  /**
+  * Valida llaves activas antes de ejecutar checkout.
+  *
+  * @return WP_Error|null
+  */
+  private function validate_active_credentials() {
+    $public_key = trim( (string) $this->public_key );
+    $secret_key = trim( (string) $this->secret_key );
+    $environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
+
+    if ( '' === $public_key || '' === $secret_key ) {
+      return new WP_Error( 'epicpay_missing_credentials', __( 'Faltan llaves API activas para el entorno seleccionado.', 'epicpay' ) );
+    }
+
+    // Si quedó guardado un valor enmascarado, la API responderá 401/400.
+    if ( false !== strpos( $public_key, '*' ) || false !== strpos( $secret_key, '*' ) ) {
+      return new WP_Error( 'epicpay_masked_credentials', __( 'Las llaves guardadas parecen estar enmascaradas. Reingresalas completas y guarda nuevamente.', 'epicpay' ) );
+    }
+
+    if ( 0 !== strpos( $public_key, 'pk_' ) || 0 !== strpos( $secret_key, 'sk_' ) ) {
+      return new WP_Error( 'epicpay_invalid_credentials_prefix', __( 'Formato de llaves inválido. Verifica que inicien con pk_ y sk_.', 'epicpay' ) );
+    }
+
+    if ( 'sandbox' === $environment && ( 0 !== strpos( $public_key, 'pk_test_' ) || 0 !== strpos( $secret_key, 'sk_test_' ) ) ) {
+      return new WP_Error( 'epicpay_env_credentials_mismatch', __( 'Estás en Sandbox pero las llaves activas no son de prueba (test).', 'epicpay' ) );
+    }
+
+    if ( 'live' === $environment && ( 0 !== strpos( $public_key, 'pk_live_' ) || 0 !== strpos( $secret_key, 'sk_live_' ) ) ) {
+      return new WP_Error( 'epicpay_env_credentials_mismatch', __( 'Estás en Live pero las llaves activas no son de producción (live).', 'epicpay' ) );
+    }
+
+    return null;
+  }
+
+  /**
   * Función para patron de singleton
   * 
   * @author Mimer
@@ -445,7 +496,8 @@ class EpicPay extends WC_Payment_Gateway {
     $customer_order = new WC_Order( $order_id );
     $is_subscription_order = $this->order_contains_subscription( $order_id );
 
-    error_log(
+    $this->log_message(
+      'info',
       sprintf(
         'EpicPay process_payment: order=%d env=%s subscription_order=%s pk=%s sk=%s',
         (int) $order_id,
@@ -455,6 +507,13 @@ class EpicPay extends WC_Payment_Gateway {
         $this->mask_key_preview( $this->secret_key )
       )
     );
+
+    $credentials_error = $this->validate_active_credentials();
+    if ( is_wp_error( $credentials_error ) ) {
+      $this->log_message( 'error', 'EpicPay credentials validation failed: ' . $credentials_error->get_error_message() );
+      wc_add_notice( $credentials_error->get_error_message(), 'error' );
+      return array( 'result' => 'failure' );
+    }
     
     // Detectar si es una suscripción
     // Primero verificar que WC_Subscriptions está disponible
@@ -483,7 +542,7 @@ class EpicPay extends WC_Payment_Gateway {
     $checkout_transaction = $checkout->create();
 
     if ( is_wp_error( $checkout_transaction ) ) {
-      error_log( 'EpicPay process_payment WP_Error: ' . $checkout_transaction->get_error_message() );
+      $this->log_message( 'error', 'EpicPay process_payment WP_Error: ' . $checkout_transaction->get_error_message() );
       wc_add_notice( $checkout_transaction->get_error_message(), 'error' );
       return array( 'result' => 'failure' );
     }
