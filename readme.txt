@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.0.1
+Stable tag: 2.0.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,10 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.0.2 =
+* Fix para Checkout Blocks: ahora se envian correctamente las features/suportes del gateway a la integracion de bloques.
+* Correccion para compatibilidad con carritos de suscripcion donde el metodo no aparecia en "Opciones de pago".
 
 = 2.0.0 =
 * Agregar soporte completo para WooCommerce Subscriptions.

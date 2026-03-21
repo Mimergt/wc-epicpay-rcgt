@@ -62,10 +62,13 @@ final class WC_EpicPay_Blocks extends AbstractPaymentMethodType {
     * @since 1.2.0
     */ 
     public function get_payment_method_data() {
+        $supports = is_array( $this->gateway->supports ) ? array_values( $this->gateway->supports ) : [ 'products' ];
+
         return [
             'title' => $this->gateway->title,
-            'description' => $this->gateway->method_description,
+            'description' => $this->gateway->description,
             'icon' => $this->gateway->icon,
+            'supports' => $supports,
         ];
     }
 
