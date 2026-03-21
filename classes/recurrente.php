@@ -43,7 +43,7 @@ class EpicPay extends WC_Payment_Gateway {
   /**
   * Función para patron de singleton
   * 
-  * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+  * @author Mimer
   * @return EpicPay Clase inicializada
   * @since 1.2.0
   */ 

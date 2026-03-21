@@ -22,8 +22,8 @@ class EpicPayResponse
     * Ejecuta la respuesta y procesa la orden según el resultado del evento del WebHook
     * 
     * @param Object   $data  Objeto que contiene la respuesta del webhook de Recurrente.
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
-    * @link https://codingtipi.com/project/recurrente
+    * @author Mimer
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */ 
     public function execute($data){
@@ -48,9 +48,9 @@ class EpicPayResponse
     * Procesa el resultado fallido del intento de pago con tarjeta de crédito o débito
     * 
     * @param Object   $data  Objeto que contiene la respuesta del webhook de Recurrente.
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */  
     private function payment_failed($data){
@@ -63,10 +63,10 @@ class EpicPayResponse
     * Procesa el resultado satisfactorio del intento de pago con tarjeta de crédito o débito
     * 
     * @param Object   $data  Objeto que contiene la respuesta del webhook de Recurrente.
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @author Franco A. Cabrera <francocabreradev@gmail.com>
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */ 
     private function payment_succeeded($data){
@@ -82,9 +82,9 @@ class EpicPayResponse
     * Procesa el el intento de pago con transferencia bancaria
     * 
     * @param Object   $data  Objeto que contiene la respuesta del webhook de Recurrente.
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */ 
     private function bank_transfer_pending($data){
@@ -97,9 +97,9 @@ class EpicPayResponse
     * Procesa el resultado satisfactorio del intento de pago con transferencia bancaria
     * 
     * @param Object   $data  Objeto que contiene la respuesta del webhook de Recurrente.
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */ 
     private function bank_transfer_succeeded($data){
@@ -112,9 +112,9 @@ class EpicPayResponse
     * Procesa el resultado satisfactorio del intento de pago con transferencia bancaria
     * 
     * @param Object   $data  Objeto que contiene la respuesta del webhook de Recurrente.
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */ 
     private function bank_transfer_failed($data){
@@ -130,9 +130,9 @@ class EpicPayResponse
     * @param string   $status  Estado al cual se cambiara al pedido.
     * @param string   $note  Nota que se le sera agregada al pedido.
     * @param string   $cleanup  Si se desea remover el producto de recurrente.
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */
     private function process_order($checkout_id, $status, $note, $cleanup){

@@ -7,7 +7,7 @@ class EpicPaySettings
     /**
     * Obtiene el arreglo de configuraciones
     * 
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @author Franco A. Cabrera <francocabreradev@gmail.com>
     * @return Array  Arreglo de campos para la vista de configuración
     * @since 1.2.0

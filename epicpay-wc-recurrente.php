@@ -57,8 +57,8 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'epicpay_actio
 /**
 * Añade funcionalidad para compatibilidad con HPO de WooCommerce
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 1.2.0
 */
 function epicpay_hpo(){
@@ -71,8 +71,8 @@ add_action('before_woocommerce_init', 'epicpay_hpo');
 /**
 * Añade funcionalidad para compatibilidad con Blocks de WooCommerce
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 1.2.0
 */
 function declare_cart_checkout_blocks_compatibility() {
@@ -87,8 +87,8 @@ add_action('before_woocommerce_init', 'declare_cart_checkout_blocks_compatibilit
 /**
 * Añade funcionalidad para mostrar la pasarela de pagos en el area de bloques de WooCommerce
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 1.2.0
 */
 function epicpay_register_order_approval_payment_method_type() {
@@ -110,8 +110,8 @@ add_action( 'woocommerce_blocks_loaded', 'epicpay_register_order_approval_paymen
 /**
 * Añade el ícono de tarjetas aceptadas a la pasarela de pago
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 1.2.0
 */
 function filter_woocommerce_gateway_icon( $icon, $this_id ) {	
@@ -126,8 +126,8 @@ add_filter( 'woocommerce_gateway_icon', 'filter_woocommerce_gateway_icon', 10, 2
 /**
 * Cambia el mensaje de confirmación dentro de WooCommerce
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 1.2.0
 */
 function woo_change_order_received_text( $str, $order ) {
@@ -139,8 +139,8 @@ add_filter('woocommerce_thankyou_order_received_text', 'woo_change_order_receive
 /**
 * Agrega el tipo de producto recurrente al dropdown de productos
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 2.1.0
 */
 function epicpay_add_custom_product_type( $types ){
@@ -152,8 +152,8 @@ add_filter( 'product_type_selector', 'epicpay_add_custom_product_type' );
 /**
 * Agrega la clase del nuevo tipo de producto recurrente
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 2.1.0
 */
 function epicpay_woocommerce_product_class( $classname, $product_type ) {
@@ -167,8 +167,8 @@ add_filter( 'woocommerce_product_class', 'epicpay_woocommerce_product_class', 10
 /**
 * Muestra el Tab de Precio al ser un producto no simple
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 2.1.0
 */
 function epicpay_product_type_show_price() {
@@ -185,8 +185,8 @@ add_action( 'woocommerce_product_options_general_product_data', 'epicpay_product
 /**
 * Agrega los valores del tab de productos recurrentes
 * 
-* @author Luis E. Mendoza <lmendoza@codingtipi.com>
-* @link https://codingtipi.com/project/recurrente
+* @author Mimer
+* @link https://github.com/Mimergt/wc-epicpay-rcgt
 * @since 2.1.0
 */
 function epicpay_product_tab_product_tab_content() {

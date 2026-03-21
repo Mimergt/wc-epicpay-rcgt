@@ -30,9 +30,9 @@ class Single_Checkout {
     * Crea un nuevo Checkout de cobro único
     * 
     * @throws Exception Si la llamada a recurrente falla
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 2.0.0
     */
     public function create(){
@@ -72,9 +72,9 @@ class Single_Checkout {
     * Elimina un producto de la biblioteca de Recurrente
     * 
     * @throws Exception Si la llamada a recurrente falla
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string HTTP Response Code de la llamada
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 2.0.0
     */
     public function clean(){
@@ -103,10 +103,10 @@ class Single_Checkout {
     /**
     * Obtiene el modelo de un checkout para poder interactual con el API de recurrente
     * 
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @author Franco A. Cabrera <francocabreradev@gmail.com>
     * @return Array Objeto para usar con el API de Recurrente
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 2.0.1
     */ 
     private function get_api_model(){

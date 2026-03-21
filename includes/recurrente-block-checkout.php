@@ -26,9 +26,9 @@ final class WC_EpicPay_Blocks extends AbstractPaymentMethodType {
     /**
     * Registra el Script para que se despliegue en el UI
     * 
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return string Integracion con el sistema de bloques.
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */ 
     public function get_payment_method_script_handles() {
@@ -56,9 +56,9 @@ final class WC_EpicPay_Blocks extends AbstractPaymentMethodType {
     /**
     * Obtiene la información a ser utilizada en el UI
     * 
-    * @author Luis E. Mendoza <lmendoza@codingtipi.com>
+    * @author Mimer
     * @return Array Propiedades de la pasarela de pago.
-    * @link https://codingtipi.com/project/recurrente
+    * @link https://github.com/Mimergt/wc-epicpay-rcgt
     * @since 1.2.0
     */ 
     public function get_payment_method_data() {
