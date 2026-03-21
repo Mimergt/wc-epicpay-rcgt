@@ -31,6 +31,20 @@ class EpicPay extends WC_Payment_Gateway {
     $this->icon = $this->get_option('icon');
     $this->has_fields = false;
     $this->description = "<img src".$this->icon."/>";
+    
+    // Define subscription support
+    $this->supports = array(
+      'products',
+      'subscriptions',
+      'subscription_cancellation',
+      'subscription_suspension',
+      'subscription_reactivation',
+      'subscription_amount_changes',
+      'subscription_date_changes',
+      'subscription_payment_method_change',
+      'subscription_payment_method_change_customer',
+      'subscription_payment_method_change_admin',
+    );
       
     // Define los campos a utilizar en el formulario de configuración
     $this->init_form_fields();
@@ -99,7 +113,15 @@ class EpicPay extends WC_Payment_Gateway {
     if ( is_admin() ) {
       add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
       add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_settings_visibility_script' ) );
-    }  
+    }
+    
+    // Agregar hook para pagos recurrentes programados por WC
+    add_action( 'woocommerce_scheduled_subscription_payment_epicpay', array( $this, 'scheduled_subscription_payment' ), 10, 2 );
+    
+    // Hooks para cambios de estado de suscripción
+    add_action( 'woocommerce_subscription_cancelled_epicpay', array( $this, 'on_subscription_cancelled' ), 10, 1 );
+    add_action( 'woocommerce_subscription_suspended_epicpay', array( $this, 'on_subscription_suspended' ), 10, 1 );
+    add_action( 'woocommerce_subscription_reactivated_epicpay', array( $this, 'on_subscription_reactivated' ), 10, 1 );
   }  
 
   /**
@@ -316,31 +338,41 @@ class EpicPay extends WC_Payment_Gateway {
   * @since 2.0.0
   */
   public function process_payment( $order_id ) {
-    include_once 'single-checkout.php';
-
-    $customer_order = new WC_Order( $order_id ); //Crear Orden de WooCommerce
-      
-    $single_checkout = new Single_Checkout($customer_order); //Inicia un checkout simpre 
-    $checkout_transaction = $single_checkout->create(); 
+    $customer_order = new WC_Order( $order_id );
+    
+    // Detectar si es una suscripción
+    if ( wcs_is_subscription( $order_id ) ) {
+      include_once 'subscription-checkout.php';
+      $checkout = new Subscription_Checkout( $customer_order );
+    } else {
+      include_once 'single-checkout.php';
+      $checkout = new Single_Checkout( $customer_order );
+    }
+    
+    $checkout_transaction = $checkout->create();
 
     if ( is_wp_error( $checkout_transaction ) ) {
       wc_add_notice( $checkout_transaction->get_error_message(), 'error' );
       return array( 'result' => 'failure' );
     }
-    if ( 201 !== (int) $single_checkout->code || empty( $single_checkout->url ) ) {
+    if ( 201 !== (int) $checkout->code || empty( $checkout->url ) ) {
       wc_add_notice( __( 'No se pudo iniciar el checkout con EpicPay.', 'epicpay' ), 'error' );
       return array( 'result' => 'failure' );
     }
 
-    $customer_order->add_order_note( 'EpicPay: Se inicializo el proceso de pago.' );
-    $customer_order->update_meta_data( 'epicpay_checkout_id', $single_checkout->id );
-    $customer_order->update_meta_data( 'epicpay_checkout_url', $single_checkout->url );
-    $customer_order->update_meta_data( 'epicpay_product_id', $single_checkout->product );
+    $note = wcs_is_subscription( $order_id ) 
+      ? 'EpicPay: Se inicializó suscripción.'
+      : 'EpicPay: Se inicializo el proceso de pago.';
+
+    $customer_order->add_order_note( $note );
+    $customer_order->update_meta_data( 'epicpay_checkout_id', $checkout->id );
+    $customer_order->update_meta_data( 'epicpay_checkout_url', $checkout->url );
+    $customer_order->update_meta_data( 'epicpay_product_id', $checkout->product );
     $customer_order->save();
 
     return array(
       'result'   => 'success',
-      'redirect' => $single_checkout->url,
+      'redirect' => $checkout->url,
     );
   }
   
@@ -379,5 +411,59 @@ class EpicPay extends WC_Payment_Gateway {
         echo "<div class=\"error\"><p>" . sprintf( __( 'EpicPay: faltan llaves para el entorno %s.', 'epicpay' ), esc_html( $environment_label ) ) . "</p></div>";
       }
     }   
+  }
+
+  /**
+   * Procesa pago de renovación programada por WooCommerce
+   * Se ejecuta cuando WC Subscriptions programa una renovación
+   * 
+   * @param float $amount_to_charge Monto a cobrar
+   * @param WC_Order $renewal_order Orden de renovación
+   */
+  public function scheduled_subscription_payment( $amount_to_charge, $renewal_order ) {
+    // Crear checkout para renovación
+    include_once 'single-checkout.php';
+    
+    $checkout = new Single_Checkout( $renewal_order );
+    $checkout_result = $checkout->create();
+    
+    if ( is_wp_error( $checkout_result ) ) {
+      WC_Subscriptions_Manager::process_subscription_payment_failure_on_order( $renewal_order );
+      return;
+    }
+    
+    // Guardar referencia de checkout
+    $renewal_order->update_meta_data( 'epicpay_renewal_checkout_id', $checkout->id );
+    $renewal_order->add_order_note( 'EpicPay: Checkout de renovación creado.' );
+    $renewal_order->save();
+    
+    // El webhook manejará el resultado cuando regrese del pago
+  }
+  
+  /**
+   * Maneja cancelación de suscripción
+   * 
+   * @param WC_Subscription $subscription
+   */
+  public function on_subscription_cancelled( $subscription ) {
+    $subscription->add_order_note( 'Suscripción cancelada en EpicPay.' );
+  }
+  
+  /**
+   * Maneja suspensión de suscripción
+   * 
+   * @param WC_Subscription $subscription
+   */
+  public function on_subscription_suspended( $subscription ) {
+    $subscription->add_order_note( 'Suscripción suspendida en EpicPay.' );
+  }
+  
+  /**
+   * Maneja reactivación de suscripción
+   * 
+   * @param WC_Subscription $subscription
+   */
+  public function on_subscription_reactivated( $subscription ) {
+    $subscription->add_order_note( 'Suscripción reactivada en EpicPay.' );
   }
 }

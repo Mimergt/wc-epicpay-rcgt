@@ -150,6 +150,20 @@ class EpicPayResponse
         $order->add_order_note( $note );
         $order->update_status( $status );
 
+        // Si es una orden de renovación de suscripción, registrar el pago
+        if ( function_exists( 'wcs_get_subscriptions_for_order' ) ) {
+            $subscriptions = wcs_get_subscriptions_for_order( $order->get_id() );
+            if ( ! empty( $subscriptions ) ) {
+                foreach ( $subscriptions as $subscription ) {
+                    // Si el estado es completado, registrar el pago
+                    if ( 'wc-completed' === $status || 'completed' === str_replace( 'wc-', '', $status ) ) {
+                        WC_Subscriptions_Manager::process_subscription_payments_on_order( $order );
+                    }
+                    break;
+                }
+            }
+        }
+
         if($cleanup == true){
             include_once dirname(__FILE__) . '/../classes/single-checkout.php';
             $clean_product = $order->get_meta('epicpay_product_id');
