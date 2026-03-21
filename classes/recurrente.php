@@ -555,6 +555,30 @@ class EpicPay extends WC_Payment_Gateway {
     $body_raw = wp_remote_retrieve_body( $response );
     $body = json_decode( $body_raw, true );
 
+    if ( 201 !== $code && $this->is_tokenization_min_amount_error( $body, $body_raw ) ) {
+      // Algunas cuentas rechazan amount_in_cents=0. Fallback: setup checkout sin items.
+      $this->log_message( 'warning', 'EpicPay tokenization min amount validation detected, retrying without items.' );
+      $payload = $this->get_tokenization_checkout_payload( $user_id, true );
+      $response = wp_remote_post(
+        $url,
+        array(
+          'headers' => $this->get_api_headers(),
+          'body' => wp_json_encode( $payload ),
+          'timeout' => 30,
+        )
+      );
+
+      if ( is_wp_error( $response ) ) {
+        $this->log_message( 'error', 'EpicPay tokenization retry failed: ' . $response->get_error_message() );
+        wc_add_notice( __( 'No se pudo iniciar el guardado de tarjeta.', 'epicpay' ), 'error' );
+        return array( 'result' => 'failure' );
+      }
+
+      $code = (int) wp_remote_retrieve_response_code( $response );
+      $body_raw = wp_remote_retrieve_body( $response );
+      $body = json_decode( $body_raw, true );
+    }
+
     if ( 201 !== $code ) {
       $message = isset( $body['error'] ) ? $body['error'] : ( isset( $body['message'] ) ? $body['message'] : __( 'Error al iniciar tokenización.', 'epicpay' ) );
       $this->log_message( 'error', 'EpicPay tokenization checkout API error HTTP ' . $code . ': ' . $message . ' | response=' . $body_raw );
@@ -647,8 +671,9 @@ class EpicPay extends WC_Payment_Gateway {
   * @param int $user_id Usuario WP.
   * @return array
   */
-  private function get_tokenization_checkout_payload( $user_id ) {
+  private function get_tokenization_checkout_payload( $user_id, $without_items = false ) {
     $currency = get_woocommerce_currency();
+    $recurrente_user_id = (string) get_user_meta( $user_id, 'epicpay_recurrente_user_id', true );
     $success_url = add_query_arg(
       array(
         'wc-api' => 'epicpay',
@@ -669,17 +694,7 @@ class EpicPay extends WC_Payment_Gateway {
       home_url( '/' )
     );
 
-    return array(
-      'items' => array(
-        array(
-          'name' => __( 'Guardar método de pago', 'epicpay' ),
-          'currency' => $currency,
-          'amount_in_cents' => 0,
-          'charge_type' => 'one_time',
-          'quantity' => 1,
-        ),
-      ),
-      'user_id' => (string) $user_id,
+    $payload = array(
       'success_url' => $success_url,
       'cancel_url' => $cancel_url,
       'metadata' => array(
@@ -687,6 +702,46 @@ class EpicPay extends WC_Payment_Gateway {
         'wp_user_id' => (string) $user_id,
       ),
     );
+
+    if ( ! $without_items ) {
+      $payload['items'] = array(
+        array(
+          'name' => __( 'Guardar método de pago', 'epicpay' ),
+          'currency' => $currency,
+          'amount_in_cents' => 0,
+          'charge_type' => 'one_time',
+          'quantity' => 1,
+        ),
+      );
+    }
+
+    if ( 0 === strpos( $recurrente_user_id, 'us_' ) ) {
+      $payload['user_id'] = $recurrente_user_id;
+    }
+
+    return $payload;
+  }
+
+  /**
+  * Detecta errores de validación por monto mínimo al tokenizar.
+  *
+  * @param array|null $body Body decodificado.
+  * @param string $body_raw Body crudo.
+  * @return bool
+  */
+  private function is_tokenization_min_amount_error( $body, $body_raw ) {
+    $message = '';
+    if ( is_array( $body ) ) {
+      $message .= isset( $body['message'] ) ? (string) $body['message'] : '';
+      $message .= ' ' . ( isset( $body['error'] ) ? (string) $body['error'] : '' );
+    }
+    $message .= ' ' . (string) $body_raw;
+    $message = strtolower( $message );
+
+    return false !== strpos( $message, 'amount in cents' )
+      || false !== strpos( $message, 'precio debe ser mayor' )
+      || false !== strpos( $message, 'mayor a q5' )
+      || false !== strpos( $message, 'prices debe ser un numero mayor' );
   }
 
   /**

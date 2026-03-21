@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,10 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.1.1 =
+* Fix para "Añadir método de pago": cuando Recurrente rechaza tokenización con monto 0 por validación de mínimo, ahora se reintenta automáticamente en modo setup sin items.
+* Ajuste de `user_id` en tokenización: solo se envía si existe un `recurrente user_id` válido (`us_...`).
 
 = 2.1.0 =
 * Nueva funcionalidad: guardar tarjeta del cliente desde Mi cuenta > Métodos de pago usando checkout de tokenización (monto 0) en Recurrente.
