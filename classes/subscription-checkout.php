@@ -147,7 +147,8 @@ class Subscription_Checkout {
 			}
 
 			$error_message = isset( $body->error ) ? $body->error : ( isset( $body->message ) ? $body->message : __( 'Error al crear checkout.', 'epicpay' ) );
-			error_log( 'EpicPay Subscription API Error (Code ' . $this->code . '): ' . $error_message );
+			$raw_body = wp_remote_retrieve_body( $response );
+			error_log( 'EpicPay Subscription API Error (Code ' . $this->code . '): ' . $error_message . ' | response=' . $raw_body );
 			
 			return new WP_Error( 'epicpay_checkout_create_failed', $error_message );
 

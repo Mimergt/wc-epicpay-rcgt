@@ -6,6 +6,7 @@ class EpicPay extends WC_Payment_Gateway {
   public $environment;
   public $public_key;    
   public $secret_key;
+  public $enable_subscriptions;
   public $sandbox_public_key;
   public $sandbox_secret_key;
   public $live_public_key;
@@ -132,6 +133,23 @@ class EpicPay extends WC_Payment_Gateway {
   private function get_configured_order_status_slug() {
     $configured_status = ! empty( $this->order_status ) ? $this->order_status : 'wc-completed';
     return str_replace( 'wc-', '', $configured_status );
+  }
+
+  /**
+  * Devuelve una versión enmascarada de una llave para logs.
+  *
+  * @param string $key Llave a enmascarar.
+  * @return string
+  */
+  private function mask_key_preview( $key ) {
+    $key = trim( (string) $key );
+    if ( '' === $key ) {
+      return 'empty';
+    }
+
+    $start = substr( $key, 0, 8 );
+    $end = strlen( $key ) > 4 ? substr( $key, -4 ) : $key;
+    return $start . '...' . $end;
   }
 
   /**
@@ -426,6 +444,17 @@ class EpicPay extends WC_Payment_Gateway {
   public function process_payment( $order_id ) {
     $customer_order = new WC_Order( $order_id );
     $is_subscription_order = $this->order_contains_subscription( $order_id );
+
+    error_log(
+      sprintf(
+        'EpicPay process_payment: order=%d env=%s subscription_order=%s pk=%s sk=%s',
+        (int) $order_id,
+        ! empty( $this->environment ) ? $this->environment : 'sandbox',
+        $is_subscription_order ? 'yes' : 'no',
+        $this->mask_key_preview( $this->public_key ),
+        $this->mask_key_preview( $this->secret_key )
+      )
+    );
     
     // Detectar si es una suscripción
     // Primero verificar que WC_Subscriptions está disponible
@@ -454,6 +483,7 @@ class EpicPay extends WC_Payment_Gateway {
     $checkout_transaction = $checkout->create();
 
     if ( is_wp_error( $checkout_transaction ) ) {
+      error_log( 'EpicPay process_payment WP_Error: ' . $checkout_transaction->get_error_message() );
       wc_add_notice( $checkout_transaction->get_error_message(), 'error' );
       return array( 'result' => 'failure' );
     }

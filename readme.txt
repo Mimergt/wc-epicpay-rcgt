@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.0.4
+Stable tag: 2.0.5
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,11 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.0.5 =
+* Fix de compatibilidad PHP 8.2+: se declara la propiedad `enable_subscriptions` para evitar warning de propiedad dinámica.
+* Logging de diagnóstico reforzado en process_payment para validar entorno y llaves activas en tiempo de pago.
+* Logging extendido de respuesta API en checkout de suscripciones para diagnosticar errores de autenticación.
 
 = 2.0.4 =
 * Nuevo ajuste opcional en admin para activar/desactivar compatibilidad con WooCommerce Subscriptions.
