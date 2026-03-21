@@ -341,7 +341,17 @@ class EpicPay extends WC_Payment_Gateway {
     $customer_order = new WC_Order( $order_id );
     
     // Detectar si es una suscripción
-    if ( wcs_is_subscription( $order_id ) ) {
+    // Primero verificar que WC_Subscriptions está disponible
+    if ( function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order_id ) ) {
+      // Validar que WC_Subscriptions_Order existe
+      if ( ! class_exists( 'WC_Subscriptions_Order' ) ) {
+        wc_add_notice( 
+          __( 'WooCommerce Subscriptions debe estar instalado y activo para procesar suscripciones.', 'epicpay' ), 
+          'error' 
+        );
+        return array( 'result' => 'failure' );
+      }
+
       include_once 'subscription-checkout.php';
       $checkout = new Subscription_Checkout( $customer_order );
     } else {
@@ -360,7 +370,7 @@ class EpicPay extends WC_Payment_Gateway {
       return array( 'result' => 'failure' );
     }
 
-    $note = wcs_is_subscription( $order_id ) 
+    $note = function_exists( 'wcs_is_subscription' ) && wcs_is_subscription( $order_id ) 
       ? 'EpicPay: Se inicializó suscripción.'
       : 'EpicPay: Se inicializo el proceso de pago.';
 
