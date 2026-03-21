@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.1.7
+Stable tag: 2.1.8
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,11 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.1.8 =
+* Se archiva temporalmente la funcionalidad de "guardar tarjeta" (tokenization / add payment method) para priorizar estabilidad operativa.
+* El plugin mantiene soporte completo de checkout y suscripciones con EpicPay/Recurrente.
+* Se añade filtro `epicpay_enable_tokenization_experimental` (desactivado por defecto) para reactivar pruebas bajo responsabilidad del integrador.
 
 = 2.1.7 =
 * Diagnóstico profundo de tokenización: logging por intento de `GET /api/checkouts/{id}` (código HTTP, intento y resolución de `payment_method_id`).

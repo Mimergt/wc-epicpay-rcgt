@@ -36,8 +36,6 @@ class EpicPay extends WC_Payment_Gateway {
     // Define subscription support
     $this->supports = array(
       'products',
-      'tokenization',
-      'add_payment_method',
       'subscriptions',
       'subscription_cancellation',
       'subscription_suspension',
@@ -48,6 +46,11 @@ class EpicPay extends WC_Payment_Gateway {
       'subscription_payment_method_change_customer',
       'subscription_payment_method_change_admin',
     );
+
+    if ( $this->is_tokenization_enabled() ) {
+      $this->supports[] = 'tokenization';
+      $this->supports[] = 'add_payment_method';
+    }
       
     // Define los campos a utilizar en el formulario de configuración
     $this->init_form_fields();
@@ -87,6 +90,15 @@ class EpicPay extends WC_Payment_Gateway {
   */
   private function is_subscriptions_enabled() {
     return ! isset( $this->enable_subscriptions ) || 'yes' === $this->enable_subscriptions;
+  }
+
+  /**
+  * Define si la funcionalidad de guardar tarjeta está habilitada.
+  *
+  * @return bool
+  */
+  private function is_tokenization_enabled() {
+    return (bool) apply_filters( 'epicpay_enable_tokenization_experimental', false, $this );
   }
 
   /**
@@ -228,6 +240,10 @@ class EpicPay extends WC_Payment_Gateway {
   * @since 2.0.1
   */
   public function supports( $feature ) {
+    if ( in_array( $feature, array( 'tokenization', 'add_payment_method' ), true ) && ! $this->is_tokenization_enabled() ) {
+      return false;
+    }
+
     if ( in_array( $feature, $this->get_subscription_supports(), true ) && ! $this->is_subscriptions_enabled() ) {
       return false;
     }
@@ -351,6 +367,12 @@ class EpicPay extends WC_Payment_Gateway {
   */
   public function redirect_callback(){
     if ( isset( $_GET['tokenize'] ) ) {
+      if ( ! $this->is_tokenization_enabled() ) {
+        wc_clear_notices();
+        wc_add_notice( __( 'La funcionalidad de guardar tarjeta está temporalmente deshabilitada.', 'epicpay' ), 'notice' );
+        wp_safe_redirect( wc_get_account_endpoint_url( 'payment-methods' ) );
+        exit;
+      }
       $this->answer_tokenization_redirect();
     } elseif ( isset( $_GET['status'] ) ) {
       $this->answer_redirect(); //Esto quiere decir que es el redirect URL del checkout
@@ -666,6 +688,11 @@ class EpicPay extends WC_Payment_Gateway {
   * @return array
   */
   public function add_payment_method() {
+    if ( ! $this->is_tokenization_enabled() ) {
+      wc_add_notice( __( 'Guardar tarjeta está temporalmente deshabilitado en EpicPay.', 'epicpay' ), 'error' );
+      return array( 'result' => 'failure' );
+    }
+
     $user_id = get_current_user_id();
     if ( ! $user_id ) {
       wc_add_notice( __( 'Debes iniciar sesión para guardar una tarjeta.', 'epicpay' ), 'error' );
