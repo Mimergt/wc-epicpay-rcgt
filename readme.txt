@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 0.1.0
+Stable tag: 1.2.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -26,7 +26,7 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 
 == Changelog ==
 
-= 0.1.0 =
+= 1.2.0 =
 * Rebranding inicial a EpicPay.
 * Eliminado update checker heredado.
 * Migracion de cliente HTTP a WordPress HTTP API.
