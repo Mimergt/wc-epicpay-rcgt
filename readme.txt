@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.1.2
+Stable tag: 2.1.3
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,11 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.1.3 =
+* Fix en retorno de tokenización: extracción de `payment_method_id` robusta desde múltiples estructuras de respuesta de Recurrente (`payment_intent`, `payment`, `setup_intent`).
+* Retry automático al consultar `GET /api/checkouts/{id}` para esperar propagación del método de pago.
+* Limpieza de notices para evitar mensajes contradictorios de éxito/error en "Métodos de pago".
 
 = 2.1.2 =
 * Fix para "Añadir método de pago" en cuentas con mínimo de precio: fallback a micro-cobro de verificación (Q5 por defecto) cuando Recurrente rechaza monto 0.
