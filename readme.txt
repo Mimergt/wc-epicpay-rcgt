@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 2.0.6
+Stable tag: 2.0.7
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,10 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 2.0.7 =
+* Se eliminó el enmascarado de llaves API en la pantalla de configuración para evitar guardar valores con asteriscos.
+* Se mantiene validación estricta de credenciales para detectar llaves inválidas antes de llamar al API.
 
 = 2.0.6 =
 * Validación preventiva de llaves activas antes de llamar al API (detecta llaves enmascaradas y desajuste de entorno test/live).
