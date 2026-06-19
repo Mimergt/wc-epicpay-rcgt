@@ -48,14 +48,43 @@ class EpicPay extends WC_Payment_Gateway {
   * Define las credenciales activas segun el entorno seleccionado.
   */
   private function apply_environment_credentials() {
-    $environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
+    $this->secret_key = $this->resolve_active_secret_key();
+  }
 
-    if ( 'live' === $environment ) {
-      $this->secret_key = ! empty( $this->live_secret_key ) ? $this->live_secret_key : $this->secret_key;
-      return;
+  /**
+  * Normaliza una llave secreta para evitar espacios accidentales.
+  *
+  * @param mixed $value Valor de la llave.
+  * @return string
+  */
+  private function normalize_secret_key( $value ) {
+    return is_string( $value ) ? trim( $value ) : '';
+  }
+
+  /**
+  * Resuelve la llave secreta activa con fallback entre campos configurados.
+  *
+  * @return string
+  */
+  private function resolve_active_secret_key() {
+    $environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
+    $selected_key = 'live' === $environment ? $this->live_secret_key : $this->sandbox_secret_key;
+    $fallback_key = 'live' === $environment ? $this->sandbox_secret_key : $this->live_secret_key;
+
+    $candidates = array(
+      $selected_key,
+      $this->secret_key,
+      $fallback_key,
+    );
+
+    foreach ( $candidates as $candidate ) {
+      $normalized_key = $this->normalize_secret_key( $candidate );
+      if ( '' !== $normalized_key ) {
+        return $normalized_key;
+      }
     }
 
-    $this->secret_key = ! empty( $this->sandbox_secret_key ) ? $this->sandbox_secret_key : $this->secret_key;
+    return '';
   }
 
   /**
@@ -361,7 +390,7 @@ class EpicPay extends WC_Payment_Gateway {
   */
   public function validate_activation(){
     if( $this->enabled == "yes" ) {
-      if ( empty( $this->secret_key ) ) {
+      if ( '' === $this->resolve_active_secret_key() ) {
         $current_environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
         $environment_label = 'live' === $current_environment ? __( 'Live', 'epicpay' ) : __( 'Sandbox', 'epicpay' );
         echo "<div class=\"error\"><p>" . sprintf( __( '<strong>%s</strong> No tienes configurado correctamente el plugin, <a href="%s">por favor dirigete a la configuracion.</a>', 'epicpay' ), $this->method_title, admin_url( 'admin.php?page=wc-settings&tab=checkout&section=epicpay' ) ) . "</p></div>";

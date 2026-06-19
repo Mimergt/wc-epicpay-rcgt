@@ -160,8 +160,6 @@ class Single_Checkout {
     private function get_headers() {
         return array(
             'X-SECRET-KEY' => $this->gateway->secret_key,
-            'X-ORIGIN' => site_url(),
-            'X-STORE' => get_bloginfo( 'name' ),
             'Content-Type' => 'application/json',
         );
     }

@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 1.3.5
+Stable tag: 1.3.6
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,10 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura la X-SECRET-KEY de Recurrente segun tu entorno.
 
 == Changelog ==
+
+= 1.3.6 =
+* Se fortalecio la resolucion de la llave secreta activa (trim + fallback entre campos) para evitar fallos de autenticacion por configuracion de entorno.
+* Se simplificaron los headers del checkout para enviar solo lo requerido por la API: X-SECRET-KEY.
 
 = 1.3.5 =
 * La integracion de API ahora autentica usando unicamente X-SECRET-KEY.
