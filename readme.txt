@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 1.3.3
+Stable tag: 1.3.4
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,10 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura X-PUBLIC-KEY y X-SECRET-KEY de Recurrente.
 
 == Changelog ==
+
+= 1.3.4 =
+* Checkout blocks ahora usa la descripcion configurada en la pasarela (en lugar de la descripcion tecnica interna del plugin).
+* Se agrego versionado del script de bloques para invalidar cache y reflejar cambios del boton de pago inmediatamente.
 
 = 1.3.3 =
 * Se actualizo el texto del boton de pago en checkout blocks a "Pagar de forma segura".

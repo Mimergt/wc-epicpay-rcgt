@@ -32,6 +32,8 @@ final class WC_EpicPay_Blocks extends AbstractPaymentMethodType {
     * @since 1.2.0
     */ 
     public function get_payment_method_script_handles() {
+        $script_path = plugin_dir_path(__FILE__) . 'block/checkout.js';
+        $script_version = file_exists( $script_path ) ? filemtime( $script_path ) : null;
 
         wp_register_script(
             'epicpay-blocks-integration',
@@ -43,7 +45,7 @@ final class WC_EpicPay_Blocks extends AbstractPaymentMethodType {
                 'wp-html-entities',
                 'wp-i18n',
             ],
-            null,
+            $script_version,
             true
         );
         if( function_exists( 'wp_set_script_translations' ) ) {            
@@ -64,7 +66,7 @@ final class WC_EpicPay_Blocks extends AbstractPaymentMethodType {
     public function get_payment_method_data() {
         return [
             'title' => $this->gateway->title,
-            'description' => $this->gateway->method_description,
+            'description' => ! empty( $this->gateway->description ) ? $this->gateway->description : $this->gateway->method_description,
             'icon' => $this->gateway->icon,
         ];
     }
