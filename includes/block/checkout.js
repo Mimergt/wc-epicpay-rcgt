@@ -15,7 +15,7 @@ const Block_Gateway = {
     edit: Object( window.wp.element.createElement )( Content, null ),
     canMakePayment: () => true,
     ariaLabel: label,
-    placeOrderButtonLabel: 'Proceder a EpicPay',
+    placeOrderButtonLabel: 'Pagar de forma segura',
     supports: {
         features: settings.supports,
     },
