@@ -3,7 +3,7 @@
 * Plugin Name: EpicPay - WooCommerce
 * Plugin URI: https://github.com/Mimergt/wc-epicpay-rcgt
 * Description: Plugin para WooCommerce que habilita la pasarela de pago EpicPay (Recurrente) como metodo de pago en el checkout.
-* Version:     1.3.4
+* Version:     1.3.5
 * Requires PHP: 7.4
 * Author:      Mimer
 * Author URI: https://epic.gt

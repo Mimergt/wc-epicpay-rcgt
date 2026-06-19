@@ -4,11 +4,8 @@
 */
 class EpicPay extends WC_Payment_Gateway {
   public $environment;
-  public $public_key;    
   public $secret_key;
-  public $sandbox_public_key;
   public $sandbox_secret_key;
-  public $live_public_key;
   public $live_secret_key;
   public $allow_transfer;
   public $installments;
@@ -54,12 +51,10 @@ class EpicPay extends WC_Payment_Gateway {
     $environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
 
     if ( 'live' === $environment ) {
-      $this->public_key = ! empty( $this->live_public_key ) ? $this->live_public_key : $this->public_key;
       $this->secret_key = ! empty( $this->live_secret_key ) ? $this->live_secret_key : $this->secret_key;
       return;
     }
 
-    $this->public_key = ! empty( $this->sandbox_public_key ) ? $this->sandbox_public_key : $this->public_key;
     $this->secret_key = ! empty( $this->sandbox_secret_key ) ? $this->sandbox_secret_key : $this->secret_key;
   }
 
@@ -119,11 +114,8 @@ class EpicPay extends WC_Payment_Gateway {
 
     $script = "jQuery(function($){
       var keyFields = [
-        '#woocommerce_epicpay_sandbox_public_key',
         '#woocommerce_epicpay_sandbox_secret_key',
-        '#woocommerce_epicpay_live_public_key',
         '#woocommerce_epicpay_live_secret_key',
-        '#woocommerce_epicpay_public_key',
         '#woocommerce_epicpay_secret_key'
       ];
 
@@ -170,15 +162,12 @@ class EpicPay extends WC_Payment_Gateway {
       function toggleEpicPayFields(){
         var env = $('#woocommerce_epicpay_environment').val();
         var sandboxFields = [
-          '#woocommerce_epicpay_sandbox_public_key',
           '#woocommerce_epicpay_sandbox_secret_key'
         ];
         var liveFields = [
-          '#woocommerce_epicpay_live_public_key',
           '#woocommerce_epicpay_live_secret_key'
         ];
         var legacyFields = [
-          '#woocommerce_epicpay_public_key',
           '#woocommerce_epicpay_secret_key'
         ];
 
@@ -372,11 +361,11 @@ class EpicPay extends WC_Payment_Gateway {
   */
   public function validate_activation(){
     if( $this->enabled == "yes" ) {
-      if ( empty( $this->secret_key ) || empty( $this->public_key ) ) {
+      if ( empty( $this->secret_key ) ) {
         $current_environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
         $environment_label = 'live' === $current_environment ? __( 'Live', 'epicpay' ) : __( 'Sandbox', 'epicpay' );
         echo "<div class=\"error\"><p>" . sprintf( __( '<strong>%s</strong> No tienes configurado correctamente el plugin, <a href="%s">por favor dirigete a la configuracion.</a>', 'epicpay' ), $this->method_title, admin_url( 'admin.php?page=wc-settings&tab=checkout&section=epicpay' ) ) . "</p></div>";
-        echo "<div class=\"error\"><p>" . sprintf( __( 'EpicPay: faltan llaves para el entorno %s.', 'epicpay' ), esc_html( $environment_label ) ) . "</p></div>";
+        echo "<div class=\"error\"><p>" . sprintf( __( 'EpicPay: falta la llave secreta para el entorno %s.', 'epicpay' ), esc_html( $environment_label ) ) . "</p></div>";
       }
     }   
   }
