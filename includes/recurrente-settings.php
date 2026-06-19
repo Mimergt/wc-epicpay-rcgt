@@ -45,17 +45,17 @@ class EpicPaySettings
             ),
             'sandbox_secret_key' => array(
               'title'    => __( 'Clave secreta sandbox', 'epicpay' ),
-              'type'     => 'text',
+              'type'     => 'password',
               'desc_tip' => __( 'Llave secreta para pruebas (test).', 'epicpay' ),
             ),
             'live_secret_key' => array(
               'title'    => __( 'Clave secreta live', 'epicpay' ),
-              'type'     => 'text',
+              'type'     => 'password',
               'desc_tip' => __( 'Llave secreta para produccion.', 'epicpay' ),
             ),
             'secret_key' => array(
               'title'    => __( 'Clave secreta (legado)', 'epicpay' ),
-              'type'    => 'text',
+              'type'    => 'password',
               'desc_tip'  => __( 'Campo legacy para compatibilidad con configuraciones anteriores.', 'epicpay' ),
             ),
             'allow_transfer' => array(

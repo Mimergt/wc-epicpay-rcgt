@@ -142,52 +142,6 @@ class EpicPay extends WC_Payment_Gateway {
     }
 
     $script = "jQuery(function($){
-      var keyFields = [
-        '#woocommerce_epicpay_sandbox_secret_key',
-        '#woocommerce_epicpay_live_secret_key',
-        '#woocommerce_epicpay_secret_key'
-      ];
-
-      function maskEpicPayValue(value){
-        if (!value) {
-          return '';
-        }
-
-        if (value.length <= 8) {
-          return value;
-        }
-
-        return value.substring(0, 4) + '********' + value.substring(value.length - 4);
-      }
-
-      function initializeMaskedField(selector){
-        var field = $(selector);
-        if (!field.length) {
-          return;
-        }
-
-        var rawValue = field.val();
-        field.attr('data-epicpay-full-value', rawValue);
-
-        if (rawValue) {
-          field.val(maskEpicPayValue(rawValue));
-        }
-
-        field.on('focus', function(){
-          $(this).val($(this).attr('data-epicpay-full-value') || '');
-        });
-
-        field.on('input', function(){
-          $(this).attr('data-epicpay-full-value', $(this).val());
-        });
-
-        field.on('blur', function(){
-          var latestValue = $(this).val();
-          $(this).attr('data-epicpay-full-value', latestValue);
-          $(this).val(maskEpicPayValue(latestValue));
-        });
-      }
-
       function toggleEpicPayFields(){
         var env = $('#woocommerce_epicpay_environment').val();
         var sandboxFields = [
@@ -213,16 +167,7 @@ class EpicPay extends WC_Payment_Gateway {
         });
       }
 
-      keyFields.forEach(initializeMaskedField);
       $('#woocommerce_epicpay_environment').on('change', toggleEpicPayFields);
-      $('#mainform').on('submit', function(){
-        keyFields.forEach(function(selector){
-          var field = $(selector);
-          if (field.length) {
-            field.val(field.attr('data-epicpay-full-value') || '');
-          }
-        });
-      });
       toggleEpicPayFields();
     });";
 

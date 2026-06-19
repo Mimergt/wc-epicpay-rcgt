@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 1.3.6
+Stable tag: 1.3.7
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,10 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura la X-SECRET-KEY de Recurrente segun tu entorno.
 
 == Changelog ==
+
+= 1.3.7 =
+* Se elimino el enmascarado de los campos secretos en el admin para evitar guardar valores truncados por el frontend.
+* Los campos secretos ahora se muestran como password, manteniendo el valor intacto al guardar.
 
 = 1.3.6 =
 * Se fortalecio la resolucion de la llave secreta activa (trim + fallback entre campos) para evitar fallos de autenticacion por configuracion de entorno.
