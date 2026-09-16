@@ -3,7 +3,7 @@ Contributors: mimergt
 Tags: WooCommerce, pagos, recurrente, checkout
 Requires at least: 6.0
 Tested up to: 6.8.1
-Stable tag: 1.3.7
+Stable tag: 1.3.8
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -25,6 +25,10 @@ Esta version corresponde a la Fase Uno del producto derivado: rebranding, limpie
 5. Configura la X-SECRET-KEY de Recurrente segun tu entorno.
 
 == Changelog ==
+
+= 1.3.8 =
+* Se agrego logging de diagnostico (WC_Logger, source "epicpay") en process_payment y en la creacion de checkout: entorno activo, vista previa enmascarada de la llave secreta usada, codigo HTTP y cuerpo de respuesta de Recurrente cuando falla.
+* Se corrigio el warning de PHP 8.2 "Creation of dynamic property" causado por valores legados (ej. public_key) en la configuracion guardada.
 
 = 1.3.7 =
 * Se elimino el enmascarado de los campos secretos en el admin para evitar guardar valores truncados por el frontend.

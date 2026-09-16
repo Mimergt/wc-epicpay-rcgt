@@ -49,11 +49,13 @@ class Single_Checkout {
             );
 
             if ( is_wp_error( $response ) ) {
+                $this->gateway->log_message( 'error', 'EpicPay Single_Checkout network error: ' . $response->get_error_message() );
                 return $response;
             }
 
             $this->code = (int) wp_remote_retrieve_response_code( $response );
-            $body = json_decode( wp_remote_retrieve_body( $response ) );
+            $body_raw = wp_remote_retrieve_body( $response );
+            $body = json_decode( $body_raw );
 
             if ( 201 === $this->code ) {
                 $this->id = isset( $body->id ) ? $body->id : null;
@@ -68,6 +70,16 @@ class Single_Checkout {
             }
 
             $error_message = isset( $body->error ) ? $body->error : ( isset( $body->message ) ? $body->message : __( 'Error al crear checkout.', 'epicpay' ) );
+            $this->gateway->log_message(
+                'error',
+                sprintf(
+                    'EpicPay Single_Checkout API error http=%d environment=%s secret_key=%s response=%s',
+                    $this->code,
+                    ! empty( $this->gateway->environment ) ? $this->gateway->environment : 'sandbox',
+                    $this->gateway->mask_key_preview( $this->gateway->secret_key ),
+                    substr( (string) $body_raw, 0, 500 )
+                )
+            );
             return new WP_Error( 'epicpay_checkout_create_failed', $error_message );
 
         } catch (Exception $e) {
