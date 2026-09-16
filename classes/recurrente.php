@@ -37,18 +37,53 @@ class EpicPay extends WC_Payment_Gateway {
     $this->init_actions();
       
     // Proceso para convertir las configuraciones a variables.
+    // property_exists evita el warning de PHP 8.2 "Creation of dynamic property"
+    // cuando queda un valor legado (ej. public_key) en la configuracion guardada.
     foreach ( $this->settings as $setting_key => $value ) {
-      $this->$setting_key = $value;
+      if ( property_exists( $this, $setting_key ) ) {
+        $this->$setting_key = $value;
+      }
     }
 
     $this->apply_environment_credentials();
-  } 
+  }
 
   /**
   * Define las credenciales activas segun el entorno seleccionado.
   */
   private function apply_environment_credentials() {
     $this->secret_key = $this->resolve_active_secret_key();
+  }
+
+  /**
+  * Escribe un mensaje en el log de WooCommerce (source "epicpay").
+  *
+  * @param string $level   Nivel de log (debug|info|warning|error).
+  * @param string $message Mensaje a registrar.
+  */
+  public function log_message( $level, $message ) {
+    if ( function_exists( 'wc_get_logger' ) ) {
+      wc_get_logger()->log( $level, $message, array( 'source' => 'epicpay' ) );
+      return;
+    }
+    error_log( 'EpicPay [' . strtoupper( $level ) . '] ' . $message );
+  }
+
+  /**
+  * Genera una vista previa segura de una llave para logging (sin exponerla completa).
+  *
+  * @param string $key Llave completa.
+  * @return string
+  */
+  public function mask_key_preview( $key ) {
+    $key = (string) $key;
+    if ( '' === $key ) {
+      return '(vacia)';
+    }
+    if ( strlen( $key ) <= 10 ) {
+      return str_repeat( '*', strlen( $key ) );
+    }
+    return substr( $key, 0, 7 ) . '...' . substr( $key, -4 ) . ' (len=' . strlen( $key ) . ')';
   }
 
   /**
@@ -282,11 +317,26 @@ class EpicPay extends WC_Payment_Gateway {
     include_once 'single-checkout.php';
 
     $customer_order = new WC_Order( $order_id ); //Crear Orden de WooCommerce
-      
-    $single_checkout = new Single_Checkout($customer_order); //Inicia un checkout simpre 
-    $checkout_transaction = $single_checkout->create(); 
+
+    $environment = ! empty( $this->environment ) ? $this->environment : 'sandbox';
+    $this->log_message(
+      'info',
+      sprintf(
+        'EpicPay process_payment order=%d environment=%s secret_key=%s',
+        $order_id,
+        $environment,
+        $this->mask_key_preview( $this->secret_key )
+      )
+    );
+
+    $single_checkout = new Single_Checkout($customer_order); //Inicia un checkout simpre
+    $checkout_transaction = $single_checkout->create();
 
     if ( is_wp_error( $checkout_transaction ) ) {
+      $this->log_message(
+        'error',
+        'EpicPay process_payment failed order=' . $order_id . ' code=' . (int) $single_checkout->code . ' error=' . $checkout_transaction->get_error_message()
+      );
       wc_add_notice( $checkout_transaction->get_error_message(), 'error' );
       return array( 'result' => 'failure' );
     }
