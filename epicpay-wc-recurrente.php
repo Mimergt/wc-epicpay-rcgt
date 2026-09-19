@@ -131,7 +131,10 @@ add_filter( 'woocommerce_gateway_icon', 'filter_woocommerce_gateway_icon', 10, 2
 * @since 1.2.0
 */
 function woo_change_order_received_text( $str, $order ) {
-  $customer_order = wc_get_order( $order );
+  $customer_order = $order ? wc_get_order( $order ) : false;
+  if ( ! $customer_order ) {
+    return $str;
+  }
   return sprintf( "Gracias, %s!", esc_html( $customer_order->get_billing_first_name() ) );
 }
 add_filter('woocommerce_thankyou_order_received_text', 'woo_change_order_received_text', 10, 2 );
